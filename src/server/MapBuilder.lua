@@ -219,6 +219,88 @@ local function buildArena(parent)
 	return tiles, slime
 end
 
+
+-- รันเวย์แฟชั่นโชว์: เดินจากหลังเวที (z=84) มาหน้าเวที (z=44) หันหน้าเข้าหาจุดเกิด
+local function buildRunway(parent)
+	local model = Instance.new("Model")
+	model.Name = "Runway"
+	local x0, height = 0, 3
+
+	part({ Name = "Stage", Size = Vector3.new(12, height, 44), Position = Vector3.new(x0, height / 2, 64), Color = Color3.fromRGB(255, 255, 255) }, model)
+	part({ Name = "Carpet", Size = Vector3.new(6, 0.2, 44), Position = Vector3.new(x0, height + 0.1, 64), Color = Color3.fromRGB(255, 90, 160), Material = Enum.Material.Fabric }, model)
+	for i = 0, 10 do
+		local z = 44 + i * 4
+		for _, side in { -1, 1 } do
+			local bulb = part({
+				Name = "Bulb",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 0.8,
+				Position = Vector3.new(x0 + side * 5.4, height + 0.4, z),
+				Color = Color3.fromHSV(i / 11, 0.5, 1),
+				Material = Enum.Material.Neon,
+				CanCollide = false,
+			}, model)
+			bulb:SetAttribute("Blink", i)
+		end
+	end
+	-- หลังเวที + ฉากกั้น
+	part({ Name = "Backstage", Size = Vector3.new(26, height, 14), Position = Vector3.new(x0, height / 2, 93), Color = Color3.fromRGB(250, 235, 245) }, model)
+	for i = -6, 6 do
+		part({
+			Name = "Curtain",
+			Size = Vector3.new(2, 14, 0.6),
+			Position = Vector3.new(x0 + i * 2, height + 7, 86 + (i % 2) * 0.4),
+			Color = i % 2 == 0 and Color3.fromRGB(200, 40, 110) or Color3.fromRGB(230, 70, 140),
+			Material = Enum.Material.Fabric,
+		}, model)
+	end
+	local sign = part({ Name = "Sign", Size = Vector3.new(24, 4, 1), Position = Vector3.new(x0, height + 16, 86), Color = Color3.fromRGB(255, 120, 190), Material = Enum.Material.Neon }, model)
+	billboard(sign, "👗 แฟชั่นโชว์", Color3.fromRGB(255, 255, 255), 0, UDim2.fromOffset(420, 100))
+
+	-- เสาไฟสปอตไลต์
+	for _, side in { -1, 1 } do
+		for _, z in { 48, 66 } do
+			part({ Name = "Pole", Size = Vector3.new(0.8, 16, 0.8), Position = Vector3.new(x0 + side * 9, 8, z), Color = Color3.fromRGB(60, 60, 70), Material = Enum.Material.Metal }, model)
+			local head = part({ Name = "Lamp", Size = Vector3.new(2, 2, 2), Position = Vector3.new(x0 + side * 9, 16, z), Color = Color3.fromRGB(255, 250, 220), Material = Enum.Material.Neon }, model)
+			local spot = Instance.new("SpotLight")
+			spot.Face = Enum.NormalId.Bottom
+			spot.Angle = 50
+			spot.Range = 30
+			spot.Brightness = 3
+			spot.Color = Color3.fromRGB(255, 220, 240)
+			spot.Parent = head
+		end
+	end
+
+	-- โพเดียม 3 อันดับ (ข้างหน้าเวที)
+	local podium = {}
+	local podiumColors = { Color3.fromRGB(255, 205, 50), Color3.fromRGB(200, 210, 225), Color3.fromRGB(220, 140, 80) }
+	local podiumHeights = { 6, 4.5, 3 }
+	local podiumX = { 0, -5, 5 }
+	for rank = 1, 3 do
+		local h = podiumHeights[rank]
+		local block = part({
+			Name = "Podium" .. rank,
+			Size = Vector3.new(5, h, 5),
+			Position = Vector3.new(-20 + podiumX[rank], h / 2, 48),
+			Color = podiumColors[rank],
+			Material = Enum.Material.SmoothPlastic,
+		}, model)
+		billboard(block, ({ "🥇", "🥈", "🥉" })[rank], Color3.new(1, 1, 1), h / 2 + 1.5, UDim2.fromOffset(60, 60))
+		podium[rank] = CFrame.new(block.Position + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, math.pi, 0)
+	end
+
+	model.Parent = parent
+	local facing = CFrame.Angles(0, 0, 0) -- เดินไปทาง -Z (หน้าตัวละครชี้ -Z)
+	return {
+		Start = CFrame.new(x0, height + 3, 82) * facing,
+		End = CFrame.new(x0, height + 3, 45) * facing,
+		Backstage = CFrame.new(x0, height, 93) * facing,
+		Audience = CFrame.new(x0 + 16, 0, 56),
+		Podium = podium,
+	}
+end
+
 function MapBuilder.Build()
 	local old = workspace:FindFirstChild("Baseplate")
 	if old then
@@ -284,7 +366,8 @@ function MapBuilder.Build()
 		local radius = rng:NextNumber(50, 105)
 		local pos = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
 		-- เว้นที่ร้านค้า / กล่องของขวัญ
-		if (pos - Vector3.new(32, 0, -22)).Magnitude > 20 and (pos - Vector3.new(-32, 0, -22)).Magnitude > 16 then
+		local onRunway = math.abs(pos.X) < 30 and pos.Z > 30 and pos.Z < 105
+		if not onRunway and (pos - Vector3.new(32, 0, -22)).Magnitude > 20 and (pos - Vector3.new(-32, 0, -22)).Magnitude > 16 then
 			buildTree(pos, decor)
 			placed += 1
 		end
@@ -293,6 +376,7 @@ function MapBuilder.Build()
 	buildShop(map)
 	buildGiftBox(map)
 	local tiles, slime = buildArena(map)
+	local runway = buildRunway(map)
 
 	map.Parent = workspace
 
@@ -302,6 +386,7 @@ function MapBuilder.Build()
 		Spawn = spawn,
 		Tiles = tiles,
 		Slime = slime,
+		Runway = runway,
 		ArenaCenter = MapBuilder.ArenaCenter,
 	}
 end

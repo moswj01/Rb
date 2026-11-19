@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local ItemCatalog = require(Shared.ItemCatalog)
 local Remotes = require(script.Parent.Remotes)
+local Analytics = require(script.Parent.Analytics)
 
 local DataService = {}
 
@@ -68,8 +69,12 @@ local function makeTemplate()
 		Equipped = { Skin = "skin_classic" },
 		Daily = { Last = 0, Streak = 0 },
 		Codes = {},
-		Stats = { Wins = 0, Stars = 0, Rounds = 0, Spent = 0 },
+		Stats = { Wins = 0, Stars = 0, Rounds = 0, Spent = 0, ShowdownWins = 0, RobuxPurchases = 0 },
 		Settings = { SkipRounds = false },
+		Pass = { Season = Config.PartyPass.Season, XP = 0, Free = {}, Premium = {} },
+		Tutorial = { Step = 1, Progress = 0 },
+		FirstJoin = 0,
+		StarterBought = false,
 		Purchases = {}, -- PurchaseId ของ Robux ที่ให้ของไปแล้ว (กันให้ซ้ำ)
 	}
 end
@@ -137,6 +142,13 @@ local function loadPlayer(player)
 		data = deepCopy(TEMPLATE)
 	end
 	reconcile(data, TEMPLATE)
+	if data.FirstJoin == 0 then
+		data.FirstJoin = os.time()
+		Analytics.Onboarding(player, 1, "FirstJoin")
+	end
+	if data.Pass.Season ~= Config.PartyPass.Season then
+		data.Pass = deepCopy(TEMPLATE.Pass) -- ซีซั่นใหม่ เริ่มนับใหม่
+	end
 
 	profiles[player] = data
 	setupLeaderstats(player, data)
@@ -174,30 +186,42 @@ function DataService.Push(player)
 	Remotes.DataChanged:FireClient(player, snapshot(data))
 end
 
--- ให้เหรียญ (คูณ 2 อัตโนมัติถ้ามี Game Pass DoubleCoins) คืนค่าจำนวนที่ได้จริง
+-- ให้เหรียญ: DoubleCoins x2, VIP +20% (ยกเว้น options.NoMultiplier) คืนค่าจำนวนที่ได้จริง
+-- options.Reason = ประเภทธุรกรรมสำหรับ Analytics ("Gameplay", "TimedReward", ...)
 function DataService.AddCoins(player, amount, options)
 	local data = profiles[player]
-	if not data or amount == 0 then
+	if not data or amount <= 0 then
 		return 0
 	end
-	if amount > 0 and player:GetAttribute("DoubleCoins") and not (options and options.NoMultiplier) then
-		amount *= 2
+	options = options or {}
+	if not options.NoMultiplier then
+		local multiplier = 1
+		if player:GetAttribute("DoubleCoins") then
+			multiplier *= 2
+		end
+		if player:GetAttribute("VIP") then
+			multiplier *= 1.2
+		end
+		amount = math.floor(amount * multiplier + 0.5)
 	end
-	data.Coins = math.max(0, data.Coins + amount)
+	data.Coins += amount
+	Analytics.Economy(player, "Source", "Coins", amount, data.Coins, options.Reason or "Gameplay", options.Sku)
 	return amount
 end
 
-function DataService.AddGems(player, amount)
+function DataService.AddGems(player, amount, options)
 	local data = profiles[player]
-	if not data then
+	if not data or amount <= 0 then
 		return 0
 	end
-	data.Gems = math.max(0, data.Gems + amount)
+	options = options or {}
+	data.Gems += amount
+	Analytics.Economy(player, "Source", "Gems", amount, data.Gems, options.Reason or "Gameplay", options.Sku)
 	return amount
 end
 
 -- หักเงิน คืนค่า true ถ้าสำเร็จ
-function DataService.Spend(player, currency, amount)
+function DataService.Spend(player, currency, amount, sku)
 	local data = profiles[player]
 	if not data or (currency ~= "Coins" and currency ~= "Gems") then
 		return false
@@ -209,7 +233,15 @@ function DataService.Spend(player, currency, amount)
 	if currency == "Coins" then
 		data.Stats.Spent += amount
 	end
+	Analytics.Economy(player, "Sink", currency, amount, data[currency], "Shop", sku)
 	return true
+end
+
+-- ย้อนข้อมูลกลับ (ใช้เมื่อการซื้อ Robux บันทึกไม่สำเร็จ)
+function DataService.Restore(player, backup)
+	if profiles[player] then
+		profiles[player] = backup
+	end
 end
 
 function DataService.Save(player)

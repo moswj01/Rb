@@ -11,6 +11,7 @@ local Config = require(Shared.Config)
 
 local Remotes = require(script.Parent.Remotes)
 local DataService = require(script.Parent.DataService)
+local ProgressService = require(script.Parent.ProgressService)
 
 local CollectibleService = {}
 
@@ -24,7 +25,8 @@ local function randomPosition()
 		local radius = rng:NextNumber(12, Config.LobbyRadius)
 		local origin = Vector3.new(math.cos(angle) * radius, 50, math.sin(angle) * radius)
 		local result = workspace:Raycast(origin, Vector3.new(0, -100, 0), rayParams)
-		if result then
+		local underStage = math.abs(origin.X) < 16 and origin.Z > 38 and origin.Z < 102
+		if result and not underStage then
 			return result.Position + Vector3.new(0, 2.5, 0)
 		end
 	end
@@ -50,8 +52,14 @@ local function onTouched(star, hit)
 
 	star:SetAttribute("Taken", true)
 	local gained = DataService.AddCoins(player, star:GetAttribute("Value") or Config.StarValue)
+	local big = star:GetAttribute("Big") == true
 	data.Stats.Stars += 1
+	ProgressService.AddXP(player, big and Config.XP.BigStar or Config.XP.Star)
+	if data.Stats.Stars % 50 == 0 then
+		ProgressService.CheckAchievements(player)
+	end
 	DataService.Push(player)
+	ProgressService.Tutorial(player, "Star", 1)
 	Remotes.CoinPopup:FireClient(player, gained, star.Position, star:GetAttribute("Big") == true)
 	star:Destroy()
 	task.delay(Config.StarRespawnTime, spawnStar)

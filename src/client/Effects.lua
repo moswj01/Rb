@@ -1,7 +1,11 @@
 -- Effects — แอนิเมชันฝั่ง client (ลื่นไหล ไม่กินแรงเซิร์ฟเวอร์)
---   Rainbow  : เปลี่ยนสีวนสายรุ้ง
---   SpinWeld : ใบพัดหมวกหมุน
---   Bob      : ดาวลอยขึ้นลง + หมุน
+--   Rainbow      : Part เปลี่ยนสีวนสายรุ้ง
+--   RainbowTrail : หางสายรุ้งไหลได้
+--   SpinWeld     : ใบพัด/ออร่าโคจร หมุน
+--   FlapWeld     : ปีกกระพือ
+--   ShineGradient: ฉายาระดับสูงมีแสงวิ่ง
+--   Bob          : ดาวลอยขึ้นลง + หมุน
+--   Blink        : ไฟรันเวย์กะพริบ
 --   แท็ก [👑 VIP] ในแชท
 local RunService = game:GetService("RunService")
 local CollectionService = game:GetService("CollectionService")
@@ -10,10 +14,21 @@ local TextChatService = game:GetService("TextChatService")
 
 local Effects = {}
 
-local bobBase = {} -- [Part] = CFrame เริ่มต้น
+local bobBase = {}
+local blinkParts = {}
 
 local function trackBob(part)
-	bobBase[part] = part.CFrame
+	if part:IsA("BasePart") then
+		bobBase[part] = part.CFrame
+	end
+end
+
+local function rainbowSequence(offset)
+	local keys = {}
+	for i = 0, 6 do
+		table.insert(keys, ColorSequenceKeypoint.new(i / 6, Color3.fromHSV((i / 6 + offset) % 1, 0.75, 1)))
+	end
+	return ColorSequence.new(keys)
 end
 
 function Effects.Init()
@@ -25,21 +40,56 @@ function Effects.Init()
 		bobBase[part] = nil
 	end)
 
-	RunService.RenderStepped:Connect(function()
-		local t = os.clock()
+	task.spawn(function()
+		local map = workspace:WaitForChild("Map", 30)
+		if map then
+			for _, d in map:GetDescendants() do
+				if d:IsA("BasePart") and d:GetAttribute("Blink") then
+					table.insert(blinkParts, d)
+				end
+			end
+		end
+	end)
 
+	local trailTimer = 0
+	RunService.RenderStepped:Connect(function(dt)
+		local t = os.clock()
 		local hue = (t * 0.25) % 1
+
 		for i, part in CollectionService:GetTagged("Rainbow") do
 			if part:IsA("BasePart") then
 				part.Color = Color3.fromHSV((hue + i * 0.07) % 1, 0.7, 1)
 			end
 		end
 
-		for _, w in CollectionService:GetTagged("SpinWeld") do
-			local base = w:GetAttribute("BaseC0")
-			if base then
-				w.C0 = base * CFrame.Angles(0, t * 14, 0)
+		trailTimer += dt
+		if trailTimer > 0.1 then
+			trailTimer = 0
+			local sequence = rainbowSequence(hue)
+			for _, trail in CollectionService:GetTagged("RainbowTrail") do
+				trail.Color = sequence
 			end
+		end
+
+		for _, weld in CollectionService:GetTagged("SpinWeld") do
+			local base = weld:GetAttribute("BaseC0")
+			if base then
+				weld.C0 = base * CFrame.Angles(0, t * (weld:GetAttribute("Speed") or 1), 0)
+			end
+		end
+
+		for _, weld in CollectionService:GetTagged("FlapWeld") do
+			local base = weld:GetAttribute("BaseC0")
+			if base then
+				local side = weld:GetAttribute("Side") or 1
+				local speed = weld:GetAttribute("Speed") or 1
+				local amp = weld:GetAttribute("Amp") or 0.35
+				weld.C0 = base * CFrame.Angles(0, side * math.sin(t * speed * 2) * amp, 0)
+			end
+		end
+
+		for _, gradient in CollectionService:GetTagged("ShineGradient") do
+			gradient.Offset = Vector2.new(math.sin(t * 1.5) * 0.4, 0)
 		end
 
 		for part, base in bobBase do
@@ -50,9 +100,13 @@ function Effects.Init()
 				bobBase[part] = nil
 			end
 		end
+
+		for _, part in blinkParts do
+			local index = part:GetAttribute("Blink") or 0
+			part.Color = Color3.fromHSV((hue * 2 + index * 0.09) % 1, 0.55, 1)
+		end
 	end)
 
-	-- แท็ก VIP ในแชท (TextChatService)
 	TextChatService.OnIncomingMessage = function(message)
 		local properties = Instance.new("TextChatMessageProperties")
 		local source = message.TextSource
