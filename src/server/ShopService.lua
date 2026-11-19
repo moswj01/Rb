@@ -1,0 +1,205 @@
+--[[
+	ShopService — ซื้อ/สวมใส่ไอเท็ม, รางวัลรายวัน, แลกโค้ด, ตั้งค่าเข้าร่วมมินิเกม
+	ทุกอย่างตรวจสอบที่เซิร์ฟเวอร์ (client ส่งมาแค่ "อยากได้อะไร")
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local ItemCatalog = require(Shared.ItemCatalog)
+local ShopRotation = require(Shared.ShopRotation)
+
+local Remotes = require(script.Parent.Remotes)
+local DataService = require(script.Parent.DataService)
+local CosmeticService = require(script.Parent.CosmeticService)
+
+local ShopService = {}
+
+local lastCall = {}
+
+local function allow(player)
+	local now = os.clock()
+	if lastCall[player] and now - lastCall[player] < 0.25 then
+		return false
+	end
+	lastCall[player] = now
+	return true
+end
+
+local function formatDuration(seconds)
+	seconds = math.max(0, math.floor(seconds))
+	local h = seconds // 3600
+	local m = (seconds % 3600) // 60
+	if h > 0 then
+		return string.format("%d ชม. %d นาที", h, m)
+	end
+	return string.format("%d นาที", math.max(1, m))
+end
+
+-- ให้รางวัล (Coins / Gems / Item) คืนข้อความสรุป
+function ShopService.Grant(player, reward)
+	local data = DataService.Get(player)
+	if not data then
+		return ""
+	end
+	local parts = {}
+	if reward.Coins then
+		DataService.AddCoins(player, reward.Coins, { NoMultiplier = true })
+		table.insert(parts, "🪙 " .. reward.Coins)
+	end
+	if reward.Gems then
+		DataService.AddGems(player, reward.Gems)
+		table.insert(parts, "💎 " .. reward.Gems)
+	end
+	if reward.Item and ItemCatalog.ById[reward.Item] then
+		data.Owned[reward.Item] = true
+		table.insert(parts, ItemCatalog.ById[reward.Item].Icon .. " " .. ItemCatalog.ById[reward.Item].Name)
+	end
+	return table.concat(parts, " + ")
+end
+
+local function buyItem(player, itemId)
+	if not allow(player) then
+		return false, "ใจเย็น ๆ นะ ลองอีกครั้ง 😅"
+	end
+	if type(itemId) ~= "string" then
+		return false, "ไม่พบไอเท็มนี้"
+	end
+	local item = ItemCatalog.ById[itemId]
+	local data = DataService.Get(player)
+	if not item then
+		return false, "ไม่พบไอเท็มนี้"
+	end
+	if not data then
+		return false, "กำลังโหลดข้อมูล..."
+	end
+	if data.Owned[itemId] then
+		return false, "คุณมีไอเท็มนี้อยู่แล้ว"
+	end
+	if item.Exclusive then
+		return false, "ไอเท็มพิเศษสำหรับ VIP เท่านั้น 👑"
+	end
+
+	local price = ShopRotation.GetPrice(item)
+	if not DataService.Spend(player, item.Currency, price) then
+		if item.Currency == "Gems" then
+			return false, "เพชรไม่พอ 💎"
+		end
+		return false, "เหรียญไม่พอ 🪙 ลองเก็บดาวหรือเล่นมินิเกมดูนะ!"
+	end
+
+	data.Owned[itemId] = true
+	data.Equipped[item.Category] = itemId
+	DataService.Push(player)
+	CosmeticService.Apply(player)
+	return true, "ได้รับ " .. item.Icon .. " " .. item.Name .. " แล้ว! 🎉"
+end
+
+local function equipItem(player, categoryId, itemId)
+	if not allow(player) then
+		return false, "ใจเย็น ๆ นะ 😅"
+	end
+	local data = DataService.Get(player)
+	if not data then
+		return false, "กำลังโหลดข้อมูล..."
+	end
+	if type(categoryId) ~= "string" or not ItemCatalog.CategoryById[categoryId] then
+		return false, "หมวดหมู่ไม่ถูกต้อง"
+	end
+
+	if itemId == nil then
+		-- ถอด (สกินถอดไม่ได้ → กลับเป็นตัวเดิม)
+		data.Equipped[categoryId] = if categoryId == "Skin" then "skin_classic" else nil
+	else
+		local item = type(itemId) == "string" and ItemCatalog.ById[itemId]
+		if not item or item.Category ~= categoryId then
+			return false, "ไม่พบไอเท็มนี้"
+		end
+		if not data.Owned[itemId] then
+			return false, "ยังไม่มีไอเท็มนี้"
+		end
+		data.Equipped[categoryId] = itemId
+	end
+
+	DataService.Push(player)
+	CosmeticService.Apply(player)
+	return true
+end
+
+local function claimDaily(player)
+	if not allow(player) then
+		return false, "ใจเย็น ๆ นะ 😅"
+	end
+	local data = DataService.Get(player)
+	if not data then
+		return false, "กำลังโหลดข้อมูล..."
+	end
+	local daily = data.Daily
+	local now = os.time()
+	local since = now - daily.Last
+
+	if daily.Last > 0 and since < Config.DailyCooldown then
+		return false, "รับได้อีกครั้งใน " .. formatDuration(Config.DailyCooldown - since)
+	end
+	if daily.Last == 0 or since > Config.DailyStreakReset then
+		daily.Streak = 0
+	end
+
+	daily.Streak = daily.Streak % #Config.DailyRewards + 1
+	daily.Last = now
+	local summary = ShopService.Grant(player, Config.DailyRewards[daily.Streak])
+	DataService.Push(player)
+	return true, string.format("🎁 วันที่ %d: ได้รับ %s", daily.Streak, summary)
+end
+
+local function redeemCode(player, code)
+	if not allow(player) then
+		return false, "ใจเย็น ๆ นะ 😅"
+	end
+	local data = DataService.Get(player)
+	if not data then
+		return false, "กำลังโหลดข้อมูล..."
+	end
+	if type(code) ~= "string" or #code > 40 then
+		return false, "โค้ดไม่ถูกต้อง"
+	end
+	code = string.upper((code:gsub("%s", "")))
+	local reward = Config.Codes[code]
+	if not reward then
+		return false, "ไม่พบโค้ดนี้ ลองเช็กตัวสะกดอีกครั้งนะ"
+	end
+	if data.Codes[code] then
+		return false, "คุณใช้โค้ดนี้ไปแล้ว"
+	end
+	data.Codes[code] = true
+	local summary = ShopService.Grant(player, reward)
+	DataService.Push(player)
+	return true, "🎟️ แลกโค้ดสำเร็จ! ได้รับ " .. summary
+end
+
+local function setSkipRounds(player, skip)
+	local data = DataService.Get(player)
+	if not data then
+		return false
+	end
+	data.Settings.SkipRounds = skip == true
+	player:SetAttribute("SkipRounds", data.Settings.SkipRounds)
+	DataService.Push(player)
+	return true
+end
+
+function ShopService.Init()
+	Remotes.BuyItem.OnServerInvoke = buyItem
+	Remotes.EquipItem.OnServerInvoke = equipItem
+	Remotes.ClaimDaily.OnServerInvoke = claimDaily
+	Remotes.RedeemCode.OnServerInvoke = redeemCode
+	Remotes.SetSkipRounds.OnServerInvoke = setSkipRounds
+
+	Players.PlayerRemoving:Connect(function(player)
+		lastCall[player] = nil
+	end)
+end
+
+return ShopService
