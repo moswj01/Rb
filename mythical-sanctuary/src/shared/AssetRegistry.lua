@@ -12,7 +12,7 @@
 	Greybox ไม่ใช่งานศิลป์สมบูรณ์ และห้ามส่งมอบเป็นงานจบ (ดู docs/LIMITATIONS.md)
 
 	Size = ขนาดเป้าหมายโดยประมาณ (studs) ใช้ทั้งสร้าง Greybox และตรวจ scale ของโมเดลจริง
-	Shape = รูปทรง Greybox: Tower | Building | Tree | Bush | Rock | Mushroom | Bridge | Arch | Stall | Crystal | Waterfall | Prop | Habitat
+	Shape = รูปทรง Greybox: Tower | Building | Tree | Bush | Rock | Mushroom | Bridge | Arch | Stall | Crystal | Waterfall | Ruins | Lantern | Pond | Prop | Habitat
 ]]
 
 local V = Vector3.new

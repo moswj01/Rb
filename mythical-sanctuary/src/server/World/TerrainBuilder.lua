@@ -144,6 +144,12 @@ function TerrainBuilder.HeightAt(x, z)
 		local bank = level + 1.5
 		if rd < half then
 			local bed = level - 3 - (1 - rd / half) * 5
+			for _, ford in WorldLayout.River.Fords or {} do
+				local fd = math.sqrt((x - ford.Pos.X) ^ 2 + (z - ford.Pos.Z) ^ 2)
+				if fd < ford.Radius then
+					bed = lerp(level - 1.2, bed, smoothstep(ford.Radius * 0.5, ford.Radius, fd)) -- น้ำตื้นแค่ข้อเท้า
+				end
+			end
 			h = math.min(h, bed)
 		else
 			local w = 1 - smoothstep(half, half * 2.6, rd)

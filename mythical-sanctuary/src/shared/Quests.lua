@@ -1,6 +1,6 @@
 --[[
 	Quests — เนื้อเรื่องบทนำ "เสียงเรียกจากป่า" (Phase 1)
-	Objective.Type: Talk | Forage | Craft | Discover | Trust | Bond | Visit | Place | Feed | Hatch
+	Objective.Type: Talk | Forage | Craft | Discover | Rescue | Bond | Visit | Place | Feed | Hatch | Landmark
 ]]
 
 local Quests = {}

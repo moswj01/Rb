@@ -51,6 +51,9 @@ WorldLayout.River = {
 	},
 }
 
+-- จุดข้ามน้ำตื้น (ford) — ทาง TempleTrail ตัดผ่านแม่น้ำ: ท้องน้ำตื้นพอเดินลุยได้
+WorldLayout.River.Fords = { { Pos = V(150, 0, -598), Radius = 16 } }
+
 -- ===== ทางเดิน (เส้นนำสายตา) =====
 WorldLayout.Paths = {
 	{ Id = "MainRoad", Width = 12, Material = "Cobblestone", Points = { V(0, 0, 120), V(0, 0, 0), V(0, 0, -150) } },
@@ -102,7 +105,7 @@ WorldLayout.Landmarks = {
 	{ Key = "Building_House_Medium_B", Pos = V(85, 0, -75), Yaw = -60, Zone = "MysticVillage" },
 	{ Key = "Building_House_Small_C", Pos = V(40, 0, 110), Yaw = -170, Zone = "MysticVillage" },
 	{ Key = "Building_House_Medium_C", Pos = V(-85, 0, -110), Yaw = 30, Zone = "MysticVillage" },
-	{ Key = "Landmark_StoneBridge", Pos = V(132, 9, 2), Yaw = 92, Zone = "MysticVillage", Role = "Hero" },
+	{ Key = "Landmark_StoneBridge", Pos = V(132, 9, 2), Yaw = 2, Zone = "MysticVillage", Role = "Hero" },
 	{ Key = "Landmark_NorthGate", Pos = V(0, 0, -150), Yaw = 0, Zone = "MysticVillage" },
 	{ Key = "Landmark_SanctuaryGate", Pos = V(-30, 0, 72), Yaw = 200, Zone = "MysticVillage", Role = "Portal" },
 	{ Key = "Prop_Cauldron_Public", Pos = V(52, 0, -14), Yaw = 0, Zone = "MysticVillage", Role = "Cauldron" },
@@ -160,12 +163,12 @@ WorldLayout.ForageNodes = {
 
 -- ===== NPC + ตารางเวลา (ชั่วโมงในเกม → จุดหมาย) =====
 WorldLayout.Npcs = {
-	{ Id = "npc_elder", Name = "Elder Maribel", ThaiName = "ผู้เฒ่ามาริเบล", Role = "QuestGiver", Home = V(8, 0, 14), Schedule = { { Hour = 6, Pos = V(8, 0, 14) }, { Hour = 20, Pos = V(-120, 0, 10) } } },
-	{ Id = "npc_bramble", Name = "Bramble", ThaiName = "แบรมเบิล", Role = "Shop", Home = V(-34, 0, -26), Schedule = { { Hour = 7, Pos = V(-34, 0, -26) }, { Hour = 19, Pos = V(-110, 0, -60) } } },
-	{ Id = "npc_willow", Name = "Willow", ThaiName = "วิลโลว์", Role = "Crafting", Home = V(48, 0, -22), Schedule = { { Hour = 8, Pos = V(48, 0, -22) }, { Hour = 21, Pos = V(85, 0, -75) } } },
-	{ Id = "npc_quill", Name = "Quill", ThaiName = "ควิลล์", Role = "Bestiary", Home = V(-72, 0, 40), Schedule = { { Hour = 9, Pos = V(-72, 0, 40) }, { Hour = 22, Pos = V(-72, 0, 40) } } },
-	{ Id = "npc_pip", Name = "Pip", ThaiName = "พิป", Role = "Villager", Home = V(-40, 0, 95), Schedule = { { Hour = 7, Pos = V(-18, 0, 20) }, { Hour = 12, Pos = V(110, 0, 0) }, { Hour = 17, Pos = V(5, 0, -6) }, { Hour = 20, Pos = V(-40, 0, 95) } } },
-	{ Id = "npc_rowan", Name = "Rowan", ThaiName = "โรแวน", Role = "Villager", Home = V(70, 0, 70), Schedule = { { Hour = 6, Pos = V(0, 0, -140) }, { Hour = 11, Pos = V(24, 0, 22) }, { Hour = 18, Pos = V(70, 0, 70) } } },
+	{ Id = "npc_elder", Name = "Elder Maribel", ThaiName = "ผู้เฒ่ามาริเบล", Role = "QuestGiver", Home = V(10, 0, 16), Schedule = { { Hour = 6, Pos = V(10, 0, 16) }, { Hour = 20, Pos = V(-120, 0, 10) } } },
+	{ Id = "npc_bramble", Name = "Bramble", ThaiName = "แบรมเบิล", Role = "Shop", Home = V(-24, 0, -18), Schedule = { { Hour = 7, Pos = V(-24, 0, -18) }, { Hour = 19, Pos = V(-110, 0, -60) } } },
+	{ Id = "npc_willow", Name = "Willow", ThaiName = "วิลโลว์", Role = "Crafting", Home = V(34, 0, -16), Schedule = { { Hour = 8, Pos = V(34, 0, -16) }, { Hour = 21, Pos = V(85, 0, -75) } } },
+	{ Id = "npc_quill", Name = "Quill", ThaiName = "ควิลล์", Role = "Bestiary", Home = V(-56, 0, 28), Schedule = { { Hour = 9, Pos = V(-56, 0, 28) }, { Hour = 22, Pos = V(-56, 0, 28) } } },
+	{ Id = "npc_pip", Name = "Pip", ThaiName = "พิป", Role = "Villager", Home = V(-40, 0, 95), Schedule = { { Hour = 7, Pos = V(-12, 0, 14) }, { Hour = 12, Pos = V(110, 0, 0) }, { Hour = 17, Pos = V(14, 0, -14) }, { Hour = 20, Pos = V(-40, 0, 95) } } },
+	{ Id = "npc_rowan", Name = "Rowan", ThaiName = "โรแวน", Role = "Villager", Home = V(70, 0, 70), Schedule = { { Hour = 6, Pos = V(0, 0, -140) }, { Hour = 11, Pos = V(16, 0, 14) }, { Hour = 18, Pos = V(70, 0, 70) } } },
 }
 
 WorldLayout.PlayerSpawn = V(0, 0, 60)

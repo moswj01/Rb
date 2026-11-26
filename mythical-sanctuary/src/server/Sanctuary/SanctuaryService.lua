@@ -177,7 +177,7 @@ local function createPlot(player, data)
 
 	TerrainBuilder.BuildIsland(origin)
 	for _, fixed in FIXED do
-		local model = AssetLibrary.Create(fixed.Key, worldCFrame(plot, fixed.Pos.X, fixed.Pos.Z, fixed.Yaw))
+		local model = AssetLibrary.Create(fixed.Key, worldCFrame(plot, fixed.Pos.X, fixed.Pos.Z, fixed.Yaw + 180)) -- +Z = ด้านหน้าในเลย์เอาต์
 		model.Parent = plotFolder
 		local anchor = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
 		if anchor and (fixed.Portal or fixed.Cauldron) then

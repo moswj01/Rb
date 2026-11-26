@@ -70,9 +70,10 @@ local function placeLandmarks()
 	local f = folder("Landmarks")
 	local cave = TerrainBuilder.Cave()
 	for index, entry in WorldLayout.Landmarks do
-		local cf = groundCFrame(entry.Pos, entry.Yaw)
+		-- WorldLayout ระบุ Yaw โดยถือ +Z เป็นด้านหน้า แต่โมเดลหันหน้า -Z → บวก 180°
+		local cf = groundCFrame(entry.Pos, (entry.Yaw or 0) + 180)
 		if entry.Cave then
-			cf = CFrame.new(entry.Pos.X, cave.FloorY, entry.Pos.Z) * CFrame.Angles(0, math.rad(entry.Yaw or 0), 0)
+			cf = CFrame.new(entry.Pos.X, cave.FloorY, entry.Pos.Z) * CFrame.Angles(0, math.rad((entry.Yaw or 0) + 180), 0)
 		end
 		local model = AssetLibrary.Create(entry.Key, cf, entry.Scale)
 		model.Parent = f
