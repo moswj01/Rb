@@ -96,7 +96,7 @@ end
 
 function Hud.Init(gui)
 	-- ซ้ายบน
-	local topLeft = Theme.new("Frame", { Position = UDim2.fromOffset(24, 20), Size = UDim2.fromOffset(340, 64), BackgroundTransparency = 1, Parent = gui })
+	local topLeft = Theme.new("Frame", { Position = UDim2.fromOffset(24, 64), Size = UDim2.fromOffset(340, 64), BackgroundTransparency = 1, Parent = gui })
 	Theme.scale(topLeft, 1100, 700)
 	zoneLabel = Theme.title({ Size = UDim2.new(1, 0, 0, 30), TextSize = 26, Parent = topLeft })
 	Theme.new("UIStroke", { Color = Colors.MidnightDeep, Thickness = 1.5, Transparency = 0.4, Parent = zoneLabel })

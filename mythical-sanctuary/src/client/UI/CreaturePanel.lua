@@ -26,7 +26,7 @@ local CreaturePanel = {}
 
 local Colors = Theme.Colors
 local player = Players.LocalPlayer
-local panel, nameLabel, subLabel, trustBar, trustFill, needsFrame, actionsRow, picker
+local panel, nameLabel, subLabel, trustBar, trustFill, needsFrame, actionsRow, picker, pickerList
 local needFills = {}
 local target -- model ที่โฟกัสอยู่
 local trustCache = {} -- [entityId] = trust
@@ -84,20 +84,20 @@ local function invoke(action, arg)
 end
 
 local function openPicker(action, filter)
-	Theme.clear(picker.List)
+	Theme.clear(pickerList)
 	local any = false
 	for _, item in Items.List do
 		local count = State.Count(item.Id)
 		if count > 0 and filter(item) then
 			any = true
-			Theme.button({ Text = string.format("%s  ×%d", item.ThaiName, count), Size = UDim2.new(1, -8, 0, 34), Style = "Secondary", TextSize = 16, Parent = picker.List }, function()
+			Theme.button({ Text = string.format("%s  ×%d", item.ThaiName, count), Size = UDim2.new(1, -8, 0, 34), Style = "Secondary", TextSize = 16, Parent = pickerList }, function()
 				picker.Visible = false
 				invoke(action, item.Id)
 			end)
 		end
 	end
 	if not any then
-		Theme.text({ Text = "ไม่มีของที่ใช้ได้ — ซื้อได้ที่ร้านของแบรมเบิล หรือเก็บในป่า", Size = UDim2.new(1, -8, 0, 44), TextSize = 15, TextColor3 = Colors.IvoryDim, Parent = picker.List })
+		Theme.text({ Text = "ไม่มีของที่ใช้ได้ — ซื้อได้ที่ร้านของแบรมเบิล หรือเก็บในป่า", Size = UDim2.new(1, -8, 0, 44), TextSize = 15, TextColor3 = Colors.IvoryDim, Parent = pickerList })
 	end
 	Theme.show(picker, true)
 end
@@ -221,7 +221,7 @@ function CreaturePanel.Init(gui)
 	})
 
 	picker = Theme.panel({ Name = "Picker", Size = UDim2.fromOffset(260, 220), Position = UDim2.new(0, 0, 0, -12), AnchorPoint = Vector2.new(0, 1), Visible = false, Parent = panel })
-	picker.List = Theme.new("ScrollingFrame", { Size = UDim2.new(1, -16, 1, -16), Position = UDim2.fromOffset(8, 8), BackgroundTransparency = 1, ScrollBarThickness = 4, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Parent = picker }, {
+	pickerList = Theme.new("ScrollingFrame", { Size = UDim2.new(1, -16, 1, -16), Position = UDim2.fromOffset(8, 8), BackgroundTransparency = 1, ScrollBarThickness = 4, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Parent = picker }, {
 		Theme.new("UIListLayout", { Padding = UDim.new(0, 4) }),
 	})
 
