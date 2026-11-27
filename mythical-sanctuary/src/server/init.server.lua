@@ -117,6 +117,12 @@ while not nearReady and os.clock() - waitStart < 90 do
 	task.wait(0.2)
 end
 
+step("Assets", function()
+	local n = require(Shared.AssetLibrary).NormalizeAll()
+	if n > 0 then
+		print("[Boot] ปรับขนาด/Pivot โมเดลที่ลากใส่ Assets เอง " .. n .. " ชิ้น")
+	end
+end)
 step("World props", WorldPopulator.Build)
 step("NPC", NpcService.Init)
 step("Data", DataService.Init)

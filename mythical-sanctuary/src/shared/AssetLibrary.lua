@@ -320,6 +320,41 @@ function AssetLibrary.Create(key, cframe, scale)
 	return model
 end
 
+-- ปรับโมเดลที่ลากใส่ ReplicatedStorage/Assets เองโดยตรง (ไม่ได้ผ่าน AssetTools.Register)
+-- ลบสคริปต์ · Anchor · ปรับขนาดให้ความสูงตรงสเปก · Pivot ฐานกึ่งกลาง — เรียกครั้งเดียวที่เซิร์ฟเวอร์ตอนเริ่มเกม
+function AssetLibrary.NormalizeAll()
+	local folder = assetsFolder()
+	if not folder then
+		return 0
+	end
+	local count = 0
+	for _, child in folder:GetChildren() do
+		local def = AssetRegistry.Get(child.Name)
+		if child:IsA("Model") and def and not child:GetAttribute("Normalized") and child:FindFirstChildWhichIsA("BasePart", true) then
+			sanitize(child)
+			child.PrimaryPart = nil
+			child.WorldPivot = CFrame.new(child.WorldPivot.Position)
+			local _, size = child:GetBoundingBox()
+			local factor = def.Size.Y / math.max(size.Y, 0.01)
+			local footprint = math.max(size.X, size.Z) * factor
+			local allowed = math.max(def.Size.X, def.Size.Z) * 1.6
+			if footprint > allowed then
+				factor *= allowed / footprint
+			end
+			if not child:GetAttribute("Source") then -- Register แล้วไม่ต้องย่อซ้ำ
+				pcall(function()
+					child:ScaleTo(child:GetScale() * factor)
+				end)
+			end
+			local cf, newSize = child:GetBoundingBox()
+			child.WorldPivot = CFrame.new(cf.Position.X, cf.Position.Y - newSize.Y / 2, cf.Position.Z)
+			child:SetAttribute("Normalized", true)
+			count += 1
+		end
+	end
+	return count
+end
+
 function AssetLibrary.IsPlaceholder(model)
 	return model:GetAttribute("Placeholder") == true
 end

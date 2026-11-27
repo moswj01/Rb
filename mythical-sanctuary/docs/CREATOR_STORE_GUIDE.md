@@ -3,6 +3,12 @@
 > ทางเลือกนี้ **เบี่ยงจาก Brief เดิม** (ที่ห้ามใช้ Toolbox) ตามที่เจ้าของโปรเจกต์ตัดสินใจ
 > ใช้เป็นงานชั่วคราว/ต้นแบบได้ ถ้าภายหลังจ้าง 3D Artist ทำตาม `ASSET_SPEC.md` ก็แค่ Register ทับชื่อเดิม ไม่ต้องแก้โค้ด
 
+## 🖱️ วิธีไม่ใช้ Command Bar: ลากแล้วเปลี่ยนชื่อ
+1. Explorer → ReplicatedStorage → ถ้ายังไม่มีโฟลเดอร์ `Assets` ให้คลิกขวา ReplicatedStorage › Insert Object › Folder แล้วตั้งชื่อ `Assets`
+2. Toolbox → ค้นด้วย ID ของโมเดล (ดูตารางใน `src/shared/RecommendedAssets.lua` หรือภาพ `recommended_assets.png`) → ลากโมเดลลงไปวางใน Workspace
+3. ใน Explorer ลากโมเดลนั้นไปไว้ในโฟลเดอร์ `Assets` แล้ว**เปลี่ยนชื่อ**เป็น Key เช่น `Tree_Forest_A`
+4. Save แล้ว Play — เกมจะลบสคริปต์ ปรับขนาด และตั้งจุดหมุนให้อัตโนมัติตอนเริ่มเกม
+
 ## ⚡ วิธีที่เร็วที่สุด: ติดตั้งชุดที่คัดไว้แล้วด้วยคำสั่งเดียว
 ผมคัดโมเดลฟรี 21 ชิ้นไว้ให้แล้ว (ตรวจผ่าน Creator Store API: **ฟรี · ไม่มีสคริปต์ · โพลีกอนต่ำ**) — ดูภาพรวมที่ [`recommended_assets.png`](recommended_assets.png) และรายการ+เครดิตผู้สร้างใน `src/shared/RecommendedAssets.lua`
 

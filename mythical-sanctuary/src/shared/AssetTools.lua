@@ -19,6 +19,12 @@ local AssetLibrary = require(script.Parent.AssetLibrary)
 
 local AssetTools = {}
 
+local function ensureEditMode()
+	if game:GetService("RunService"):IsRunning() then
+		error("⛔ กรุณากด Stop (หยุดเกม) ก่อน แล้วรันคำสั่งนี้ในโหมด Edit — ของที่ติดตั้งตอนกำลังเล่นจะหายเมื่อหยุดเกม", 0)
+	end
+end
+
 -- คำค้นแนะนำใน Toolbox (ภาษาอังกฤษ) — เลือกจากผู้สร้าง/แพ็กเดียวกันเพื่อให้สไตล์กลมกลืน
 AssetTools.Search = {
 	Landmark_ClockTower = "fantasy clock tower",
@@ -96,6 +102,7 @@ local function searchFor(key)
 end
 
 function AssetTools.Register(key, extraYawDegrees, modelOverride)
+	ensureEditMode()
 	local def = AssetRegistry.Get(key)
 	assert(def, "ไม่รู้จัก Key: " .. tostring(key) .. " (ดูรายชื่อใน AssetRegistry.lua)")
 	local target = modelOverride or game:GetService("Selection"):Get()[1]
@@ -109,7 +116,9 @@ function AssetTools.Register(key, extraYawDegrees, modelOverride)
 	assert(model:IsA("Model"), "ต้องเลือก Model หรือ Part")
 
 	local ChangeHistoryService = game:GetService("ChangeHistoryService")
-	ChangeHistoryService:SetWaypoint("Before AssetTools.Register")
+	pcall(function()
+		ChangeHistoryService:SetWaypoint("Before AssetTools.Register")
+	end)
 
 	-- 1) ลบสคริปต์ (โมเดลฟรีบางตัวแฝง backdoor)
 	local removed = 0
@@ -154,7 +163,9 @@ function AssetTools.Register(key, extraYawDegrees, modelOverride)
 	model:SetAttribute("Spec", def.Spec)
 	model:PivotTo(CFrame.new())
 	model.Parent = assets()
-	ChangeHistoryService:SetWaypoint("AssetTools.Register " .. key)
+	pcall(function()
+		ChangeHistoryService:SetWaypoint("AssetTools.Register " .. key)
+	end)
 	print(string.format("✔ ลงทะเบียน %s (ย่อ/ขยาย ×%.2f, ลบสคริปต์ %d ตัว) — อย่าลืม File › Save", key, factor, removed))
 	return model
 end
@@ -194,6 +205,7 @@ end
 
 -- ติดตั้งชุดโมเดลที่คัดไว้ทั้งหมด (RecommendedAssets.lua) ด้วยคำสั่งเดียว
 function AssetTools.InstallRecommended()
+	ensureEditMode()
 	local list = require(script.Parent.RecommendedAssets)
 	local done = 0
 	for index, entry in list do
