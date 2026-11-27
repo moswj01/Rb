@@ -34,6 +34,7 @@
 | [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md) | ทิศทางศิลป์, palette ต่อ biome |
 | [`docs/WORLD_DESIGN.md`](docs/WORLD_DESIGN.md) | World Design + Environmental Storytelling |
 | [`docs/world_map_preview.png`](docs/world_map_preview.png) | ภาพแผนที่ภูมิประเทศ (render จากฟังก์ชันความสูงเดียวกับเกม) |
+| [`docs/CREATOR_STORE_GUIDE.md`](docs/CREATOR_STORE_GUIDE.md) | **วิธีใส่โมเดลจาก Creator Store ให้แมพสมจริง (เริ่มที่นี่)** |
 | [`docs/ASSET_SPEC.md`](docs/ASSET_SPEC.md) | **สเปก Asset รายชิ้นสำหรับ 3D Artist / Animator / Sound** |
 | [`docs/CONCEPT_BRIEFS.md`](docs/CONCEPT_BRIEFS.md) | บรีฟสำหรับ Concept Artist |
 | [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | สถาปัตยกรรม, Data schema, Networking, Performance |

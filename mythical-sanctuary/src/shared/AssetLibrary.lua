@@ -208,14 +208,98 @@ local function buildGreybox(key, def)
 end
 
 -- คืนค่า Model ที่ตั้ง pivot (ฐานกึ่งกลาง) ไว้ที่ cframe แล้ว
+AssetLibrary.Aliases = {
+	Building_FeedShop = "Building_House_Medium_",
+	Building_Apothecary = "Building_House_Medium_",
+	Building_Library = "Building_House_Large_",
+	Sanctuary_Cottage = "Building_House_",
+	Landmark_ElderTree = "Tree_Ancient_",
+	Tree_Ancient_A = "Tree_Forest_",
+	Tree_Ancient_B = "Tree_Forest_",
+	Tree_Ancient_C = "Tree_Forest_",
+	Tree_Village_A = "Tree_Forest_",
+	Tree_Village_B = "Tree_Forest_",
+	Forage_silverfern = "Plant_Fern_",
+	Forage_honeyroot = "Plant_Fern_",
+	Forage_dewcap = "Mushroom_Glow_",
+	Forage_wisp_lily = "Mushroom_Glow_",
+	Prop_GlowcapCluster = "Mushroom_Glow_",
+	Prop_ShrineStone = "Rock_Moss_",
+	Landmark_SanctuaryGate = "Landmark_NorthGate",
+	Sanctuary_ReturnGate = "Landmark_NorthGate",
+	Prop_CaveEntrance = "Rock_Moss_",
+	Sanctuary_Cauldron = "Prop_Cauldron_Public",
+}
+
+-- หาโมเดลจริง: ชื่อตรง Key ก่อน ถ้าไม่มีใช้ "ครอบครัวเดียวกัน" (เช่น Tree_Forest_B → Tree_Forest_A)
+-- ทำให้ใส่โมเดลแค่ไม่กี่ชิ้นก็เติมทั้งแมพได้ — คืนค่า (source, sourceKey)
+local function findSource(key)
+	local folder = assetsFolder()
+	if not folder then
+		return nil
+	end
+	local exact = folder:FindFirstChild(key)
+	if exact then
+		return exact, key
+	end
+	local parts = string.split(key, "_")
+	for keep = #parts - 1, 2, -1 do
+		local prefix = table.concat(parts, "_", 1, keep) .. "_"
+		local candidates = {}
+		for _, child in folder:GetChildren() do
+			if child:IsA("Model") and string.sub(child.Name, 1, #prefix) == prefix then
+				table.insert(candidates, child)
+			end
+		end
+		if #candidates > 0 then
+			table.sort(candidates, function(a, b)
+				return a.Name < b.Name
+			end)
+			-- เลือกตัวแปรแบบคงที่ต่อ Key (ไม่สุ่มทุกครั้งที่เปิดเกม)
+			local hash = 0
+			for i = 1, #key do
+				hash = (hash * 31 + string.byte(key, i)) % 1000003
+			end
+			local chosen = candidates[hash % #candidates + 1]
+			return chosen, chosen.Name
+		end
+	end
+	-- นามแฝง: ถ้าไม่มีโมเดลเฉพาะ ใช้หมวดที่ใกล้เคียง (เช่น ร้านค้า → บ้านขนาดกลาง)
+	local alias = AssetLibrary.Aliases[key]
+	if alias then
+		for _, child in folder:GetChildren() do
+			if child:IsA("Model") and string.sub(child.Name, 1, #alias) == alias then
+				return child, child.Name
+			end
+		end
+	end
+	return nil
+end
+
+-- ป้องกันโมเดลฟรีที่แฝงสคริปต์ (backdoor) — ลบสคริปต์ทุกชนิดออกก่อนใช้
+local function sanitize(model)
+	for _, d in model:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+		end
+	end
+end
+
 function AssetLibrary.Create(key, cframe, scale)
 	local def = AssetRegistry.Get(key) or { Size = Vector3.new(4, 4, 4), Shape = "Prop", Spec = "UNSPECIFIED" }
-	local folder = assetsFolder()
-	local source = folder and folder:FindFirstChild(key)
+	local source, sourceKey = findSource(key)
 	local model
 	if source then
 		model = source:Clone()
+		sanitize(model)
 		model:SetAttribute("Placeholder", nil)
+		-- ใช้โมเดลของ Key อื่นในครอบครัว → ปรับขนาดให้ตรงความสูงที่ Key นี้ต้องการ
+		local sourceDef = sourceKey ~= key and AssetRegistry.Get(sourceKey)
+		if sourceDef and sourceDef.Size.Y > 0 then
+			scale = (scale or 1) * def.Size.Y / sourceDef.Size.Y
+		end
 	else
 		model = buildGreybox(key, def)
 	end
