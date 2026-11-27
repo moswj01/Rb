@@ -312,7 +312,7 @@ function AssetLibrary.Create(key, cframe, scale)
 	end
 	if scale and scale ~= 1 then
 		pcall(function()
-			model:ScaleTo(scale)
+			model:ScaleTo(model:GetScale() * scale) -- คูณจากขนาดที่ปรับไว้แล้ว (ไม่ตั้งใหม่)
 		end)
 	end
 	model:PivotTo(cframe or CFrame.new())

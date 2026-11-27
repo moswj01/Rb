@@ -72,6 +72,17 @@ local function placeLandmarks()
 	for index, entry in WorldLayout.Landmarks do
 		-- WorldLayout ระบุ Yaw โดยถือ +Z เป็นด้านหน้า แต่โมเดลหันหน้า -Z → บวก 180°
 		local cf = groundCFrame(entry.Pos, (entry.Yaw or 0) + 180)
+		-- ของบนพื้นเอียง (น้ำตก, ปากถ้ำ, หินศาลเจ้า): วางที่จุดต่ำสุดใต้ฐาน ไม่ให้ด้านไหนลอย
+		local def = AssetRegistry.Get(entry.Key)
+		if def and (entry.Pos.Y or 0) == 0 and not entry.Cave then
+			local hx, hz = def.Size.X * 0.4, def.Size.Z * 0.4
+			local lowest = cf.Position.Y
+			for _, o in { { -hx, -hz }, { hx, -hz }, { -hx, hz }, { hx, hz } } do
+				local p = cf * Vector3.new(o[1], 0, o[2])
+				lowest = math.min(lowest, TerrainBuilder.HeightAt(p.X, p.Z))
+			end
+			cf = cf - Vector3.new(0, cf.Position.Y - lowest, 0)
+		end
 		if entry.Cave then
 			cf = CFrame.new(entry.Pos.X, cave.FloorY, entry.Pos.Z) * CFrame.Angles(0, math.rad((entry.Yaw or 0) + 180), 0)
 		end
@@ -188,8 +199,14 @@ local function scatter(rule, rng, treePoints)
 			if rule.Key == "Tree_Forest" then
 				scale *= math.clamp(0.85 + pathEdge / 160, 0.85, 1.25)
 			end
-			local tilt = Vector2.new(rng:NextNumber(-0.05, 0.05), rng:NextNumber(-0.05, 0.05))
-			local cf = groundCFrame(p, rng:NextNumber(0, 360), tilt) * CFrame.new(0, -0.6 * scale, 0)
+			local tilt = Vector2.new(rng:NextNumber(-0.04, 0.04), rng:NextNumber(-0.04, 0.04))
+			-- วางที่พื้นต่ำสุดรอบโคน (บนเนินจะไม่มีฝั่งไหนลอย) แล้วจมรากลงดินเล็กน้อย
+			local reach = 1.5 * scale
+			local lowest = TerrainBuilder.HeightAt(x, z)
+			for _, o in { { reach, 0 }, { -reach, 0 }, { 0, reach }, { 0, -reach } } do
+				lowest = math.min(lowest, TerrainBuilder.HeightAt(x + o[1], z + o[2]))
+			end
+			local cf = CFrame.new(x, lowest - 0.8 * scale, z) * CFrame.Angles(0, math.rad(rng:NextNumber(0, 360)), 0) * CFrame.Angles(tilt.X, 0, tilt.Y)
 			local model = AssetLibrary.Create(variant, cf, scale)
 			model.Parent = f
 			table.insert(points, Vector3.new(x, 0, z))

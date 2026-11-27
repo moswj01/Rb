@@ -95,6 +95,8 @@ spawn.Neutral = true
 spawn.Duration = 0
 spawn.Parent = workspace
 
+TerrainBuilder.SetRegistry(require(Shared.AssetRegistry)) -- ฐานรากใต้อาคาร (ต้องก่อนคำนวณความสูงใด ๆ)
+spawn.Position = Vector3.new(spawnPos.X, TerrainBuilder.HeightAt(spawnPos.X, spawnPos.Z) + 2, spawnPos.Z)
 step("Environment", EnvironmentService.Init)
 
 -- Terrain สร้างในเธรดแยก: หมู่บ้านเสร็จก่อน → ระบบอื่นเริ่มต่อได้ทันที

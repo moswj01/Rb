@@ -83,7 +83,7 @@ end
 
 -- ===== ฟังก์ชันความสูงหลัก =====
 -- คืนค่า (ความสูง, ระยะขอบทางเดิน, วัสดุทางเดิน, ระยะแม่น้ำ, ระดับน้ำ) — คำนวณระยะทาง/แม่น้ำครั้งเดียว
-function TerrainBuilder.Sample(x, z)
+local function rawSample(x, z)
 	local pathEdge, pathMaterial = TerrainBuilder.Path(x, z)
 	local rd, level = TerrainBuilder.River(x, z)
 	local h = T.BaseHeight
@@ -158,6 +158,45 @@ function TerrainBuilder.Sample(x, z)
 		end
 	end
 	return h, pathEdge, pathMaterial, rd, level
+end
+
+-- ===== ฐานราก (Foundation pads): ปรับพื้นใต้อาคาร/Landmark ให้เรียบ อาคารจะนั่งบนพื้นพอดีไม่ลอย =====
+-- ใช้ทั้งตอนปั้น Terrain และตอนวางโมเดล (ฟังก์ชันเดียวกัน → ตรงกันเสมอ)
+local PAD_PREFIXES = { "Building_", "Prop_MarketStall_", "Landmark_ClockTower", "Landmark_NorthGate", "Landmark_SanctuaryGate", "Landmark_TempleRuins", "Landmark_ElderTree", "Prop_Cauldron_Public" }
+local pads = {}
+
+local function buildPads(registry)
+	for _, entry in WorldLayout.Landmarks do
+		local wanted = false
+		for _, prefix in PAD_PREFIXES do
+			if string.sub(entry.Key, 1, #prefix) == prefix then
+				wanted = true
+			end
+		end
+		local def = registry and registry.Get(entry.Key)
+		if wanted and not entry.Cave and (entry.Pos.Y or 0) == 0 then
+			local size = def and def.Size or Vector3.new(16, 16, 16)
+			local radius = math.max(size.X, size.Z) * 0.62 * (entry.Scale or 1)
+			table.insert(pads, { X = entry.Pos.X, Z = entry.Pos.Z, R = radius, H = (rawSample(entry.Pos.X, entry.Pos.Z)) })
+		end
+	end
+end
+
+function TerrainBuilder.Sample(x, z)
+	local h, pathEdge, pathMaterial, rd, level = rawSample(x, z)
+	for _, pad in pads do
+		local dx, dz = x - pad.X, z - pad.Z
+		if dx * dx + dz * dz < (pad.R * 1.8) ^ 2 then
+			local w = 1 - smoothstep(pad.R, pad.R * 1.8, math.sqrt(dx * dx + dz * dz))
+			h = lerp(h, pad.H, w)
+		end
+	end
+	return h, pathEdge, pathMaterial, rd, level
+end
+
+function TerrainBuilder.SetRegistry(registry)
+	table.clear(pads)
+	buildPads(registry)
 end
 
 function TerrainBuilder.HeightAt(x, z)
