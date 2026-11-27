@@ -109,6 +109,17 @@ task.spawn(function()
 	end)
 	if not ok then
 		warn("[Boot] ❌ Terrain ล้มเหลว: " .. tostring(err))
+		-- พื้นฉุกเฉิน: กันผู้เล่นตกโลกถ้าสร้าง Terrain ไม่ได้ (เช่นไฟล์ไม่มี Workspace.Terrain)
+		local ground = Instance.new("Part")
+		ground.Name = "EmergencyGround"
+		ground.Anchored = true
+		ground.Size = Vector3.new(2048, 4, 2048)
+		ground.Position = Vector3.new(0, WorldLayout.Village.Height - 2, -350)
+		ground.Material = Enum.Material.Grass
+		ground.Color = Color3.fromRGB(108, 150, 72)
+		ground:SetAttribute("Placeholder", true)
+		ground.Parent = workspace
+		workspace:SetAttribute("BootStage", "TerrainError")
 		nearReady = true
 	end
 end)

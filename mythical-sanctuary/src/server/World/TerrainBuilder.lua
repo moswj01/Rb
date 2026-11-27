@@ -352,7 +352,8 @@ function TerrainBuilder.BuildWorld(markBaked, onNearReady)
 		end
 		return false
 	end
-	local terrain = workspace.Terrain
+	local terrain = workspace:FindFirstChildOfClass("Terrain")
+	assert(terrain, "ไม่พบ Workspace.Terrain ในไฟล์เกม — เปิด Terrain Editor ใน Studio หนึ่งครั้ง หรือ build ใหม่ด้วย default.project.json ล่าสุด")
 	terrain:Clear()
 	terrain.Decoration = true
 	terrain.WaterColor = Color3.fromRGB(46, 120, 128)
