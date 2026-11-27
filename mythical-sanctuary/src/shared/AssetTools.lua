@@ -95,11 +95,10 @@ local function searchFor(key)
 	return "?"
 end
 
-function AssetTools.Register(key, extraYawDegrees)
+function AssetTools.Register(key, extraYawDegrees, modelOverride)
 	local def = AssetRegistry.Get(key)
 	assert(def, "ไม่รู้จัก Key: " .. tostring(key) .. " (ดูรายชื่อใน AssetRegistry.lua)")
-	local selection = game:GetService("Selection"):Get()
-	local target = selection[1]
+	local target = modelOverride or game:GetService("Selection"):Get()[1]
 	assert(target, "เลือกโมเดลใน Workspace ก่อน แล้วค่อยเรียก Register")
 	local model = target
 	if target:IsA("BasePart") then
@@ -128,6 +127,7 @@ function AssetTools.Register(key, extraYawDegrees)
 		model.PrimaryPart = model:FindFirstChildWhichIsA("BasePart", true)
 	end
 
+	assert(model:FindFirstChildWhichIsA("BasePart", true), "โมเดลนี้ไม่มีชิ้นส่วน 3D")
 	-- 2) ขนาด: ให้ความสูงตรงสเปก แต่ฐานไม่กว้างเกิน 1.6 เท่าของที่แมพเผื่อไว้
 	local _, size = model:GetBoundingBox()
 	local factor = def.Size.Y / math.max(size.Y, 0.01)
@@ -156,6 +156,56 @@ function AssetTools.Register(key, extraYawDegrees)
 	ChangeHistoryService:SetWaypoint("AssetTools.Register " .. key)
 	print(string.format("✔ ลงทะเบียน %s (ย่อ/ขยาย ×%.2f, ลบสคริปต์ %d ตัว) — อย่าลืม File › Save", key, factor, removed))
 	return model
+end
+
+-- ดาวน์โหลดโมเดลจาก Creator Store ตาม ID แล้ว Register ให้อัตโนมัติ
+function AssetTools.Insert(key, assetId, extraYawDegrees)
+	local ok, objects = pcall(function()
+		return game:GetObjects("rbxassetid://" .. tostring(assetId))
+	end)
+	if not ok or not objects or #objects == 0 then
+		ok, objects = pcall(function()
+			return { game:GetService("InsertService"):LoadAsset(assetId) }
+		end)
+	end
+	if not ok or not objects or #objects == 0 then
+		warn(string.format("✖ โหลด %s (ID %s) ไม่สำเร็จ: %s", key, tostring(assetId), tostring(objects)))
+		return nil
+	end
+	local model
+	if #objects == 1 and objects[1]:IsA("Model") then
+		model = objects[1]
+	else
+		model = Instance.new("Model")
+		for _, object in objects do
+			object.Parent = model
+		end
+	end
+	model.Parent = workspace
+	local registered, result = pcall(AssetTools.Register, key, extraYawDegrees, model)
+	if not registered then
+		warn(string.format("✖ Register %s ไม่สำเร็จ: %s", key, tostring(result)))
+		model:Destroy()
+		return nil
+	end
+	return result
+end
+
+-- ติดตั้งชุดโมเดลที่คัดไว้ทั้งหมด (RecommendedAssets.lua) ด้วยคำสั่งเดียว
+function AssetTools.InstallRecommended()
+	local list = require(script.Parent.RecommendedAssets)
+	local done = 0
+	for index, entry in list do
+		print(string.format("[%d/%d] กำลังติดตั้ง %s — \"%s\" โดย %s", index, #list, entry.Key, entry.Name, entry.Creator))
+		if AssetTools.Insert(entry.Key, entry.Id, entry.Yaw) then
+			done += 1
+		end
+		task.wait()
+	end
+	print(string.format("✔ ติดตั้งสำเร็จ %d / %d ชิ้น — กด File › Save แล้ว Play", done, #list))
+	print("ถ้าบ้านหันหลังให้ถนน: เลือกบ้านใน ReplicatedStorage/Assets ไม่ได้ ให้ Insert ใหม่พร้อมองศา เช่น")
+	print('  require(game.ReplicatedStorage.Shared.AssetTools).Insert("Building_House_Small_A", 2210545308, 180)')
+	return done
 end
 
 -- รายการที่ยังไม่มีโมเดลจริง (และไม่มีตัวแทนจากครอบครัว/นามแฝง)
