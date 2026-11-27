@@ -123,11 +123,12 @@ function AssetTools.Register(key, extraYawDegrees, modelOverride)
 			d.Playing = false
 		end
 	end
-	if not model.PrimaryPart then
-		model.PrimaryPart = model:FindFirstChildWhichIsA("BasePart", true)
-	end
 
 	assert(model:FindFirstChildWhichIsA("BasePart", true), "โมเดลนี้ไม่มีชิ้นส่วน 3D")
+	-- วัดขนาดตามแกนโลก: ล้าง PrimaryPart (อาจเอียง) แล้วตั้ง Pivot ตรงแกนก่อนวัด
+	model.PrimaryPart = nil
+	model.WorldPivot = CFrame.new(model.WorldPivot.Position)
+
 	-- 2) ขนาด: ให้ความสูงตรงสเปก แต่ฐานไม่กว้างเกิน 1.6 เท่าของที่แมพเผื่อไว้
 	local _, size = model:GetBoundingBox()
 	local factor = def.Size.Y / math.max(size.Y, 0.01)

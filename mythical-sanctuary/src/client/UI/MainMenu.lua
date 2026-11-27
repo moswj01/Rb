@@ -40,6 +40,12 @@ function MainMenu.Show(gui, onPlay)
 
 	-- กล้อง cinematic
 	camera.CameraType = Enum.CameraType.Scriptable
+	-- StreamingEnabled: ยังไม่มีตัวละคร → ขอให้เซิร์ฟเวอร์ส่งภูมิประเทศรอบหอนาฬิกามาก่อน (ไม่งั้นบ้านลอยไม่มีพื้น)
+	task.spawn(function()
+		pcall(function()
+			Players.LocalPlayer:RequestStreamAroundAsync(WorldLayout.Landmarks[1].Pos + Vector3.new(0, WorldLayout.Village.Height, 0), 20)
+		end)
+	end)
 	local focus = WorldLayout.Landmarks[1].Pos + Vector3.new(0, WorldLayout.Village.Height + 34, 0)
 	local angle = 0
 	local orbit = RunService.RenderStepped:Connect(function(dt)

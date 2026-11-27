@@ -147,8 +147,8 @@ local function targetProfile()
 	-- สภาพอากาศ
 	local weather = State.World.Weather
 	if weather == "Mist" then
-		profile.AtmosphereDensity += 0.2
-		profile.AtmosphereHaze += 1.5
+		profile.AtmosphereDensity += 0.12
+		profile.AtmosphereHaze += 1
 	elseif weather == "Drizzle" or weather == "Rain" then
 		local w = weather == "Rain" and 1 or 0.5
 		profile.AtmosphereDensity += 0.12 * w

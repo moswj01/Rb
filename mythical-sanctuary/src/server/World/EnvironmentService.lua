@@ -76,9 +76,9 @@ function EnvironmentService.Init()
 		if not Lighting:FindFirstChildOfClass(className) then
 			local effect = Instance.new(className)
 			if className == "DepthOfFieldEffect" then
-				effect.FarIntensity = 0.12
-				effect.FocusDistance = 120
-				effect.InFocusRadius = 90
+				effect.FarIntensity = 0.04
+				effect.FocusDistance = 200
+				effect.InFocusRadius = 200
 				effect.NearIntensity = 0
 			end
 			effect.Parent = Lighting
