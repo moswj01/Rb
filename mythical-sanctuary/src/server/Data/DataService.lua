@@ -102,13 +102,17 @@ end
 
 local function withRetry(fn, label)
 	local delay = 1
-	for attempt = 1, 5 do
+	-- Studio ที่ยังไม่เปิด API Services จะ error ทุกครั้ง → ลองครั้งเดียวแล้วใช้ข้อมูลชั่วคราวทันที
+	local attempts = RunService:IsStudio() and 1 or 5
+	for attempt = 1, attempts do
 		local ok, a, b = pcall(fn)
 		if ok then
 			return true, a, b
 		end
-		warn(string.format("[DataService] %s ล้มเหลว (%d/5): %s", label, attempt, tostring(a)))
-		task.wait(delay)
+		warn(string.format("[DataService] %s ล้มเหลว (%d/%d): %s", label, attempt, attempts, tostring(a)))
+		if attempt < attempts then
+			task.wait(delay)
+		end
 		delay *= 2
 	end
 	return false

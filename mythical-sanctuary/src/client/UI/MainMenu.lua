@@ -33,7 +33,7 @@ function MainMenu.Show(gui, onPlay)
 	local subtitle = Theme.text({ Text = "ดินแดนแห่งสัตว์ในตำนาน · ผู้พิทักษ์คนใหม่ได้มาถึงแล้ว", Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 96), TextSize = 22, TextXAlignment = Enum.TextXAlignment.Center, TextTransparency = 1, Parent = center })
 	Theme.new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 138), Size = UDim2.fromOffset(260, 1), BackgroundColor3 = Colors.Gold, BorderSizePixel = 0, Parent = center })
 	local play = Theme.button({ Text = "เริ่มการผจญภัย", Size = UDim2.fromOffset(260, 52), Position = UDim2.new(0.5, 0, 0, 170), AnchorPoint = Vector2.new(0.5, 0), TextSize = 22, Visible = false, Parent = center })
-	local loading = Theme.text({ Text = "กำลังปลุกป่าให้ตื่น…", Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 184), TextSize = 17, TextColor3 = Colors.IvoryDim, TextXAlignment = Enum.TextXAlignment.Center, Parent = center })
+	local loading = Theme.text({ Text = "กำลังปลุกป่าให้ตื่น…", Size = UDim2.new(1, 0, 0, 48), Position = UDim2.fromOffset(0, 184), TextSize = 17, TextColor3 = Colors.IvoryDim, TextXAlignment = Enum.TextXAlignment.Center, Parent = center })
 
 	TweenService:Create(title, TweenInfo.new(2.2), { TextTransparency = 0 }):Play()
 	TweenService:Create(subtitle, TweenInfo.new(3), { TextTransparency = 0.05 }):Play()
@@ -46,6 +46,31 @@ function MainMenu.Show(gui, onPlay)
 		angle += dt * 0.05
 		local eye = focus + Vector3.new(math.cos(angle) * 150, 30 + math.sin(angle * 0.7) * 10, math.sin(angle) * 150)
 		camera.CFrame = CFrame.lookAt(eye, focus - Vector3.new(0, 12, 0))
+	end)
+
+	-- แสดงความคืบหน้าจริงจากเซิร์ฟเวอร์
+	local STAGES = {
+		Environment = "ตั้งค่าท้องฟ้าและแสง",
+		["World props"] = "จัดวางหมู่บ้านและป่า",
+		NPC = "ชาวบ้านกำลังตื่นนอน",
+		Data = "เปิดสมุดบันทึกของคุณ",
+		Creatures = "สัตว์ในป่ากำลังออกมา",
+	}
+	task.spawn(function()
+		local started = os.clock()
+		while loading.Parent and loading.Visible do
+			local progress = workspace:GetAttribute("BootProgress") or 0
+			local stage = workspace:GetAttribute("BootStage")
+			local text = string.format("กำลังปลุกป่าให้ตื่น… %d%%", progress)
+			if STAGES[stage] then
+				text = text .. " · " .. STAGES[stage]
+			end
+			if os.clock() - started > 90 then
+				text = text .. "\n(นานผิดปกติ — เปิด View › Output แท็บ Server เพื่อดูข้อความ ❌)"
+			end
+			loading.Text = text
+			task.wait(0.25)
+		end
 	end)
 
 	-- รอจนตัวละครพร้อม

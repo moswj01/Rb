@@ -1,7 +1,9 @@
 --[[
 	Mythical Sanctuary — Server bootstrap
-	ลำดับ: Net → Environment → Terrain → Props → NPC → Data → Creatures → Sanctuary → Gameplay
-	ผู้เล่นจะเกิดหลังโลกพร้อมแล้วเท่านั้น (กันตกโลกตอนเซิร์ฟเพิ่งเปิด)
+	ลำดับ: Net → Environment → Terrain (หมู่บ้านก่อน) → Props → NPC → Data → Creatures → Sanctuary → Gameplay
+	  • ทุกขั้นตอนห่อ pcall: ขั้นไหนพังจะพิมพ์ ❌ ใน Output แต่ผู้เล่นยังเกิดได้ (ไม่ค้างหน้าโหลด)
+	  • ผู้เล่นเกิดทันทีที่หมู่บ้านพร้อม ป่าที่เหลือสร้างต่อเบื้องหลัง
+	  • ความคืบหน้าส่งไปหน้าโหลดผ่าน workspace Attribute "BootProgress" / "BootStage"
 ]]
 
 local Players = game:GetService("Players")
@@ -19,7 +21,6 @@ local TerrainBuilder = require(World.TerrainBuilder)
 local WorldPopulator = require(World.WorldPopulator)
 local NpcService = require(World.NpcService)
 local DataService = require(script.Data.DataService)
-local Inventory = require(script.Gameplay.Inventory)
 local QuestService = require(script.Gameplay.QuestService)
 local EconomyService = require(script.Gameplay.EconomyService)
 local CreatureService = require(script.Creatures.CreatureService)
@@ -31,53 +32,28 @@ StarterPlayer.CharacterWalkSpeed = Config.NormalWalkSpeed
 Net.Event("Notify") -- สร้างโฟลเดอร์ Remote ทันที
 
 local started = os.clock()
-EnvironmentService.Init()
-if TerrainBuilder.BuildWorld(false) then
-	print(string.format("[Boot] ปั้นภูมิประเทศเสร็จใน %.1f วินาที", os.clock() - started))
+local failures = 0
+
+local function step(name, fn)
+	workspace:SetAttribute("BootStage", name)
+	local t = os.clock()
+	local ok, err = pcall(fn)
+	if ok then
+		print(string.format("[Boot] ✔ %s (%.1f วิ)", name, os.clock() - t))
+	else
+		failures += 1
+		warn(string.format("[Boot] ❌ %s ล้มเหลว: %s", name, tostring(err)))
+	end
 end
-WorldPopulator.Build()
-NpcService.Init()
 
--- จุดเกิด
-local spawnPos = WorldLayout.PlayerSpawn
-local spawn = Instance.new("SpawnLocation")
-spawn.Name = "VillageSpawn"
-spawn.Anchored = true
-spawn.Transparency = 1
-spawn.CanCollide = false
-spawn.Size = Vector3.new(8, 1, 8)
-spawn.Position = Vector3.new(spawnPos.X, TerrainBuilder.HeightAt(spawnPos.X, spawnPos.Z) + 1, spawnPos.Z)
-spawn.Neutral = true
-spawn.Duration = 0
-spawn.Parent = workspace
-
--- ระบบเกม
-DataService.Init()
-CreatureService.Environment = EnvironmentService
-CreatureService.OnDiscover = QuestService.Discover
-CreatureService.Init()
-CreatureService.InitWild(WorldLayout.SpawnAreas, {
-	WaterNear = function(center)
-		local best, bestD
-		for _, point in WorldLayout.River.Points do
-			local d = (point.Pos - center).Magnitude
-			if d < 200 and (not bestD or d < bestD) then
-				best, bestD = point.Pos, d
-			end
-		end
-		return best and (best + Vector3.new(WorldLayout.River.Width * 0.6, 0, 0)) or nil
-	end,
-})
-CreatureCare.Init()
-SanctuaryService.Init()
-QuestService.Init(WorldPopulator.Discoverables, NpcService.Lookup)
-EconomyService.Init(WorldPopulator, NpcService.Lookup, EnvironmentService)
-
--- เกิดตัวละครหลังข้อมูลโหลดเสร็จ + เกิดใหม่เมื่อหมดแรง (ไม่มีการตายในเกม แต่กันตกน้ำ/ตกหน้าผา)
-DataService.OnLoaded(function(player)
-	player:LoadCharacter()
-end)
-local function hookRespawn(player)
+-- ===== การเกิดตัวละคร (ไม่ขึ้นกับว่าระบบอื่นจะสำเร็จหรือไม่) =====
+local worldReady = false
+local function spawnPlayer(player)
+	if worldReady and player.Parent and not player.Character then
+		player:LoadCharacter()
+	end
+end
+local function hookPlayer(player)
 	player.CharacterAdded:Connect(function(character)
 		local humanoid = character:WaitForChild("Humanoid")
 		humanoid.Died:Connect(function()
@@ -87,11 +63,89 @@ local function hookRespawn(player)
 			end
 		end)
 	end)
+	spawnPlayer(player)
 end
-Players.PlayerAdded:Connect(hookRespawn)
+Players.PlayerAdded:Connect(hookPlayer)
 for _, player in Players:GetPlayers() do
-	hookRespawn(player)
+	hookPlayer(player)
 end
 
-local _ = Inventory
-print(string.format("✦ Mythical Sanctuary %s พร้อมแล้ว (%.1f วินาที)", Config.Version, os.clock() - started))
+local function setWorldReady()
+	if worldReady then
+		return
+	end
+	worldReady = true
+	workspace:SetAttribute("WorldReady", true)
+	print(string.format("[Boot] หมู่บ้านพร้อม — ผู้เล่นเกิดได้แล้ว (%.1f วิ)", os.clock() - started))
+	for _, player in Players:GetPlayers() do
+		spawnPlayer(player)
+	end
+end
+
+-- จุดเกิด (คำนวณจากฟังก์ชันความสูง ไม่ต้องรอ Terrain)
+local spawnPos = WorldLayout.PlayerSpawn
+local spawn = Instance.new("SpawnLocation")
+spawn.Name = "VillageSpawn"
+spawn.Anchored = true
+spawn.Transparency = 1
+spawn.CanCollide = false
+spawn.Size = Vector3.new(8, 1, 8)
+spawn.Position = Vector3.new(spawnPos.X, TerrainBuilder.HeightAt(spawnPos.X, spawnPos.Z) + 2, spawnPos.Z)
+spawn.Neutral = true
+spawn.Duration = 0
+spawn.Parent = workspace
+
+step("Environment", EnvironmentService.Init)
+
+-- Terrain สร้างในเธรดแยก: หมู่บ้านเสร็จก่อน → ระบบอื่นเริ่มต่อได้ทันที
+local nearReady = false
+task.spawn(function()
+	local ok, err = pcall(function()
+		if TerrainBuilder.BuildWorld(false, function()
+			nearReady = true
+		end) then
+			print(string.format("[Boot] ✔ Terrain ทั้งโลกเสร็จ (%.1f วิ)", os.clock() - started))
+		end
+	end)
+	if not ok then
+		warn("[Boot] ❌ Terrain ล้มเหลว: " .. tostring(err))
+		nearReady = true
+	end
+end)
+local waitStart = os.clock()
+while not nearReady and os.clock() - waitStart < 90 do
+	task.wait(0.2)
+end
+
+step("World props", WorldPopulator.Build)
+step("NPC", NpcService.Init)
+step("Data", DataService.Init)
+step("Creatures", function()
+	CreatureService.Environment = EnvironmentService
+	CreatureService.OnDiscover = QuestService.Discover
+	CreatureService.Init()
+	CreatureService.InitWild(WorldLayout.SpawnAreas, {
+		WaterNear = function(center)
+			local best, bestD
+			for _, point in WorldLayout.River.Points do
+				local d = (point.Pos - center).Magnitude
+				if d < 200 and (not bestD or d < bestD) then
+					best, bestD = point.Pos, d
+				end
+			end
+			return best and (best + Vector3.new(WorldLayout.River.Width * 0.6, 0, 0)) or nil
+		end,
+	})
+end)
+step("Creature care", CreatureCare.Init)
+step("Sanctuary", SanctuaryService.Init)
+step("Quests", function()
+	QuestService.Init(WorldPopulator.Discoverables, NpcService.Lookup)
+end)
+step("Economy", function()
+	EconomyService.Init(WorldPopulator, NpcService.Lookup, EnvironmentService)
+end)
+
+setWorldReady()
+workspace:SetAttribute("BootStage", failures > 0 and "Error" or "Ready")
+print(string.format("✦ Mythical Sanctuary %s พร้อมแล้ว (%.1f วินาที, ผิดพลาด %d ขั้น)", Config.Version, os.clock() - started, failures))

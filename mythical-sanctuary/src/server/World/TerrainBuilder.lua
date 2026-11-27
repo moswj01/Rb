@@ -82,7 +82,10 @@ local function inVillage(x, z)
 end
 
 -- ===== ฟังก์ชันความสูงหลัก =====
-function TerrainBuilder.HeightAt(x, z)
+-- คืนค่า (ความสูง, ระยะขอบทางเดิน, วัสดุทางเดิน, ระยะแม่น้ำ, ระดับน้ำ) — คำนวณระยะทาง/แม่น้ำครั้งเดียว
+function TerrainBuilder.Sample(x, z)
+	local pathEdge, pathMaterial = TerrainBuilder.Path(x, z)
+	local rd, level = TerrainBuilder.River(x, z)
 	local h = T.BaseHeight
 		+ math.noise(x / 260, z / 260, 0.3) * 18
 		+ math.noise(x / 95, z / 95, 1.7) * 7
@@ -100,7 +103,7 @@ function TerrainBuilder.HeightAt(x, z)
 	local forestness = smoothstep(WorldLayout.Village.Radius * 1.1, WorldLayout.Village.Radius * 2.2, villageD)
 	if forestness > 0 then
 		local ridge = 1 - math.abs(math.noise(x / 170, z / 170, 12.5))
-		local valley = smoothstep(6, 34, TerrainBuilder.Path(x, z)) * smoothstep(WorldLayout.River.Width, WorldLayout.River.Width * 3.5, (TerrainBuilder.River(x, z)))
+		local valley = smoothstep(6, 34, pathEdge) * smoothstep(WorldLayout.River.Width, WorldLayout.River.Width * 3.5, rd)
 		h += (ridge ^ 2.2) * 34 * forestness * valley
 		h += math.noise(x / 55, z / 55, 14.2) * 5 * forestness
 	end
@@ -131,14 +134,12 @@ function TerrainBuilder.HeightAt(x, z)
 	end
 
 	-- ทางเดิน: ลดความขรุขระ
-	local pathEdge = TerrainBuilder.Path(x, z)
 	if pathEdge < 6 then
 		local w = 1 - smoothstep(-2, 6, pathEdge)
 		h = lerp(h, T.BaseHeight + (h - T.BaseHeight) * 0.92, w)
 	end
 
 	-- แม่น้ำ: ร่องน้ำ + ตลิ่ง
-	local rd, level = TerrainBuilder.River(x, z)
 	local half = WorldLayout.River.Width / 2
 	if rd < half * 2.6 then
 		local bank = level + 1.5
@@ -156,12 +157,15 @@ function TerrainBuilder.HeightAt(x, z)
 			h = lerp(h, math.max(bank, math.min(h, bank + (rd - half) * 0.45)), w)
 		end
 	end
-	return h
+	return h, pathEdge, pathMaterial, rd, level
 end
 
-local function surfaceMaterial(x, z, h, slope, zoneHint)
-	local pathEdge, pathMaterial = TerrainBuilder.Path(x, z)
-	local rd, level = TerrainBuilder.River(x, z)
+function TerrainBuilder.HeightAt(x, z)
+	return (TerrainBuilder.Sample(x, z))
+end
+
+local function surfaceMaterial(x, z, h, slope, zoneHint, info)
+	local pathEdge, pathMaterial, rd, level = info[1], info[2], info[3], info[4]
 	local half = WorldLayout.River.Width / 2
 	if h < level + 0.5 and rd < half * 1.3 then
 		return (math.noise(x / 12, z / 12) > 0) and M.Sand or M.Ground
@@ -194,95 +198,111 @@ local function surfaceMaterial(x, z, h, slope, zoneHint)
 end
 
 -- เขียน voxel ทีละ chunk (มี yield เพื่อไม่ให้เซิร์ฟค้าง)
-local function writeRegion(minX, maxX, minZ, maxZ, heightFn, materialFn, waterFn)
+-- options.Focus = เขียน chunk ใกล้จุดนี้ก่อน, options.OnProgress(done, total, distance)
+local function writeRegion(minX, maxX, minZ, maxZ, heightFn, materialFn, waterFn, options)
+	options = options or {}
 	local terrain = workspace.Terrain
 	local chunk = 64
+	local chunks = {}
 	for cx = minX, maxX - 1, chunk do
 		for cz = minZ, maxZ - 1, chunk do
-			local nx, nz = chunk / VOXEL, chunk / VOXEL
-			-- ความสูงพร้อมขอบ 1 ช่องสำหรับคำนวณความชัน
-			local heights = {}
-			local lowest, highest = math.huge, -math.huge
-			for i = 0, nx + 1 do
-				heights[i] = {}
-				for k = 0, nz + 1 do
-					local x = cx + (i - 0.5) * VOXEL
-					local z = cz + (k - 0.5) * VOXEL
-					local h = heightFn(x, z)
-					heights[i][k] = h
-					lowest = math.min(lowest, h)
-					highest = math.max(highest, h)
-				end
-			end
-			local waterTop = -math.huge
-			local waters = {}
-			for i = 1, nx do
-				waters[i] = {}
-				for k = 1, nz do
-					local w = waterFn(cx + (i - 0.5) * VOXEL, cz + (k - 0.5) * VOXEL, heights[i][k])
-					waters[i][k] = w
-					if w then
-						waterTop = math.max(waterTop, w)
-					end
-				end
-			end
-			local y0 = math.floor((lowest - 12) / VOXEL) * VOXEL
-			local y1 = math.ceil((math.max(highest, waterTop) + VOXEL) / VOXEL) * VOXEL
-			local ny = (y1 - y0) / VOXEL
-
-			local materials, occupancy = {}, {}
-			for i = 1, nx do
-				materials[i], occupancy[i] = {}, {}
-				local x = cx + (i - 0.5) * VOXEL
-				for j = 1, ny do
-					materials[i][j], occupancy[i][j] = {}, {}
-				end
-				for k = 1, nz do
-					local z = cz + (k - 0.5) * VOXEL
-					local h = heights[i][k]
-					local slope = (math.abs(heights[i + 1][k] - heights[i - 1][k]) + math.abs(heights[i][k + 1] - heights[i][k - 1])) / (2 * VOXEL)
-					local surface = materialFn(x, z, h, slope)
-					local water = waters[i][k]
-					for j = 1, ny do
-						local yb = y0 + (j - 1) * VOXEL
-						local occ = math.clamp((h - yb) / VOXEL, 0, 1)
-						local mat = M.Air
-						if occ > 0 then
-							local depth = h - yb
-							if depth > 14 then
-								mat = M.Rock
-							elseif depth > 6 and surface ~= M.Rock and surface ~= M.Slate then
-								mat = M.Ground
-							else
-								mat = surface
-							end
-						end
-						if water and occ < 1 and yb < water then
-							local wocc = math.clamp((water - yb) / VOXEL, 0, 1)
-							if occ < 0.5 then
-								mat = M.Water
-								occ = math.max(occ, wocc)
-							end
-						end
-						materials[i][j][k] = mat
-						occupancy[i][j][k] = occ
-					end
-				end
-			end
-			local region = Region3.new(Vector3.new(cx, y0, cz), Vector3.new(cx + chunk, y1, cz + chunk))
-			terrain:WriteVoxels(region, VOXEL, materials, occupancy)
-			task.wait()
+			table.insert(chunks, Vector2.new(cx, cz))
 		end
+	end
+	local focus = options.Focus
+	if focus then
+		table.sort(chunks, function(a, b)
+			return (a - focus).Magnitude < (b - focus).Magnitude
+		end)
+	end
+	for index, c in chunks do
+		local cx, cz = c.X, c.Y
+		local nx, nz = chunk / VOXEL, chunk / VOXEL
+		local heights, infos = {}, {}
+		local lowest, highest = math.huge, -math.huge
+		for i = 0, nx + 1 do
+			heights[i], infos[i] = {}, {}
+			for k = 0, nz + 1 do
+				local x = cx + (i - 0.5) * VOXEL
+				local z = cz + (k - 0.5) * VOXEL
+				local h, a, b, d, e = heightFn(x, z)
+				heights[i][k] = h
+				infos[i][k] = { a, b, d, e }
+				lowest = math.min(lowest, h)
+				highest = math.max(highest, h)
+			end
+		end
+		local waterTop = -math.huge
+		local waters = {}
+		for i = 1, nx do
+			waters[i] = {}
+			for k = 1, nz do
+				local w = waterFn(cx + (i - 0.5) * VOXEL, cz + (k - 0.5) * VOXEL, heights[i][k], infos[i][k])
+				waters[i][k] = w
+				if w then
+					waterTop = math.max(waterTop, w)
+				end
+			end
+		end
+		local y0 = math.floor((lowest - 12) / VOXEL) * VOXEL
+		local y1 = math.ceil((math.max(highest, waterTop) + VOXEL) / VOXEL) * VOXEL
+		local ny = (y1 - y0) / VOXEL
+
+		local materials, occupancy = {}, {}
+		for i = 1, nx do
+			materials[i], occupancy[i] = {}, {}
+			local x = cx + (i - 0.5) * VOXEL
+			for j = 1, ny do
+				materials[i][j], occupancy[i][j] = {}, {}
+			end
+			for k = 1, nz do
+				local z = cz + (k - 0.5) * VOXEL
+				local h = heights[i][k]
+				local slope = (math.abs(heights[i + 1][k] - heights[i - 1][k]) + math.abs(heights[i][k + 1] - heights[i][k - 1])) / (2 * VOXEL)
+				local surface = materialFn(x, z, h, slope, infos[i][k])
+				local water = waters[i][k]
+				for j = 1, ny do
+					local yb = y0 + (j - 1) * VOXEL
+					local occ = math.clamp((h - yb) / VOXEL, 0, 1)
+					local mat = M.Air
+					if occ > 0 then
+						local depth = h - yb
+						if depth > 14 then
+							mat = M.Rock
+						elseif depth > 6 and surface ~= M.Rock and surface ~= M.Slate then
+							mat = M.Ground
+						else
+							mat = surface
+						end
+					end
+					if water and occ < 1 and yb < water then
+						local wocc = math.clamp((water - yb) / VOXEL, 0, 1)
+						if occ < 0.5 then
+							mat = M.Water
+							occ = math.max(occ, wocc)
+						end
+					end
+					materials[i][j][k] = mat
+					occupancy[i][j][k] = occ
+				end
+			end
+		end
+		local region = Region3.new(Vector3.new(cx, y0, cz), Vector3.new(cx + chunk, y1, cz + chunk))
+		terrain:WriteVoxels(region, VOXEL, materials, occupancy)
+		if options.OnProgress then
+			options.OnProgress(index, #chunks, focus and (c - focus).Magnitude or 0)
+		end
+		task.wait()
 	end
 end
 
-local function worldMaterial(x, z, h, slope)
+local function worldMaterial(x, z, h, slope, info)
 	local hint = inVillage(x, z) < WorldLayout.Village.Radius and "Village" or "Forest"
-	return surfaceMaterial(x, z, h, slope, hint)
+	return surfaceMaterial(x, z, h, slope, hint, info)
 end
 
-local function worldWater(x, z, h)
-	local rd, level = TerrainBuilder.River(x, z)
+local function worldWater(_x, _z, h, info)
+	local rd, level = info[3], info[4]
 	if rd < WorldLayout.River.Width * 1.4 and h < level then
 		return level
 	end
@@ -325,8 +345,11 @@ local function carveCave()
 	terrain:FillCylinder(CFrame.new(cave.Chamber + Vector3.new(-6, -0.5, 6)), 2, 12, M.Water)
 end
 
-function TerrainBuilder.BuildWorld(markBaked)
+function TerrainBuilder.BuildWorld(markBaked, onNearReady)
 	if workspace:GetAttribute("WorldBaked") and not markBaked then
+		if onNearReady then
+			task.spawn(onNearReady)
+		end
 		return false
 	end
 	local terrain = workspace.Terrain
@@ -347,8 +370,24 @@ function TerrainBuilder.BuildWorld(markBaked)
 		terrain:SetMaterialColor(M.Cobblestone, Color3.fromRGB(150, 140, 124))
 		terrain:SetMaterialColor(M.Sand, Color3.fromRGB(196, 178, 140))
 	end)
-	writeRegion(T.Min.X, T.Max.X, T.Min.Z, T.Max.Z, TerrainBuilder.HeightAt, worldMaterial, worldWater)
+	local spawn = WorldLayout.PlayerSpawn
+	local readySent = false
+	writeRegion(T.Min.X, T.Max.X, T.Min.Z, T.Max.Z, TerrainBuilder.Sample, worldMaterial, worldWater, {
+		Focus = Vector2.new(spawn.X, spawn.Z),
+		OnProgress = function(done, total, distance)
+			workspace:SetAttribute("BootProgress", math.floor(done / total * 100))
+			-- หมู่บ้านเสร็จแล้ว (รัศมี 320 studs) → ให้ผู้เล่นเกิดได้ ส่วนป่าที่เหลือสร้างต่อเบื้องหลัง
+			if not readySent and distance > 320 and onNearReady then
+				readySent = true
+				task.spawn(onNearReady)
+			end
+		end,
+	})
+	if not readySent and onNearReady then
+		task.spawn(onNearReady)
+	end
 	carveCave()
+	workspace:SetAttribute("BootProgress", 100)
 	if markBaked then
 		workspace:SetAttribute("WorldBaked", true)
 	end
