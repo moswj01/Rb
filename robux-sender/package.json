@@ -1,0 +1,12 @@
+{
+  "name": "robux-sender",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ระบบส่ง Robux อัตโนมัติด้วย Username (เว็บแอดมิน + REST API)",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  }
+}

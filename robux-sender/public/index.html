@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robux Sender</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1b1f24; --muted: #667085; --line: #e3e6ea;
+    --accent: #0a7d4f; --accent-text: #fff; --warn: #b45309; --bad: #b42318; --info: #175cd3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111418; --card: #1a1e24; --text: #e8eaed; --muted: #98a2b3; --line: #2c323a;
+      --accent: #2fb47c; --accent-text: #06231a; --warn: #f5a524; --bad: #f97066; --info: #6ea8fe; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, "Noto Sans Thai", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .stat small { color: var(--muted); display: block; }
+  .stat b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  form.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); flex: 1 1 150px; }
+  input, select, button { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); min-width: 0; }
+  button { cursor: pointer; background: var(--card); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+  button.small { padding: 3px 8px; font-size: 13px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { margin-top: 10px; font-size: 14px; min-height: 1.5em; }
+  .msg.ok { color: var(--accent); } .msg.err { color: var(--bad); }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.note { color: var(--muted); font-size: 13px; min-width: 180px; overflow-wrap: anywhere; }
+  td.actions { white-space: nowrap; }
+  .badge { padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; white-space: nowrap; }
+  .completed { color: var(--accent); } .failed { color: var(--bad); } .review { color: var(--warn); }
+  .pending, .cancelled { color: var(--muted); } .processing { color: var(--info); }
+  .banner { border-color: var(--warn); color: var(--warn); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="login" class="card" hidden>
+    <h2>เข้าสู่ระบบแอดมิน</h2>
+    <form id="loginForm" class="row">
+      <label>ADMIN_TOKEN <input id="token" type="password" autocomplete="current-password" required></label>
+      <button class="primary">เข้าสู่ระบบ</button>
+    </form>
+    <div id="loginMsg" class="msg err"></div>
+  </section>
+
+  <div id="app" hidden>
+    <header>
+      <h1>Robux Sender</h1>
+      <button id="logout">ออกจากระบบ</button>
+    </header>
+    <div id="banner" class="card banner" hidden></div>
+    <div class="stats">
+      <div class="stat"><small>บัญชีผู้จ่าย</small><b id="sAccount">–</b></div>
+      <div class="stat"><small id="sBalanceLabel">ยอดคงเหลือ</small><b id="sBalance">–</b></div>
+      <div class="stat"><small>จ่ายแล้ว 24 ชม. / วงเงิน</small><b id="sSpent">–</b></div>
+      <div class="stat"><small>รอคิว · รอตรวจสอบ</small><b id="sQueue">–</b></div>
+    </div>
+
+    <section class="card">
+      <h2>ส่ง Robux</h2>
+      <form id="sendForm" class="row">
+        <label>Username <input id="username" required pattern="@?[A-Za-z0-9_]{3,20}" autocomplete="off"></label>
+        <label>จำนวนที่ผู้รับได้ (R$) <input id="amount" type="number" min="1" step="1" required></label>
+        <label>วิธีส่ง
+          <select id="method">
+            <option value="group">Group Payout</option>
+            <option value="gamepass">ซื้อ Game Pass</option>
+          </select>
+        </label>
+        <button type="button" id="checkBtn">ตรวจสอบ</button>
+        <button class="primary">เข้าคิวส่ง</button>
+      </form>
+      <div id="sendMsg" class="msg"></div>
+    </section>
+
+    <section class="card">
+      <h2>ออเดอร์ล่าสุด</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>#</th><th>Username</th><th>จำนวน</th><th>วิธี</th><th>สถานะ</th><th>หมายเหตุ</th><th>เวลา</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const STATUS = { pending: 'รอคิว', processing: 'กำลังส่ง', completed: 'สำเร็จ', failed: 'ไม่สำเร็จ', review: 'รอตรวจสอบ', cancelled: 'ยกเลิก' };
+const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('th-TH') : '–');
+let token = '';
+try { token = sessionStorage.getItem('adminToken') || ''; } catch {}
+let timer;
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { authorization: 'Bearer ' + token, ...(options.body ? { 'content-type': 'application/json' } : {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { showLogin('โทเคนไม่ถูกต้อง'); throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+  return data;
+}
+
+function showLogin(message = '') {
+  clearInterval(timer);
+  token = '';
+  try { sessionStorage.removeItem('adminToken'); } catch {}
+  $('app').hidden = true; $('login').hidden = false; $('loginMsg').textContent = message;
+}
+
+function setMsg(text, kind = '') { $('sendMsg').textContent = text; $('sendMsg').className = 'msg ' + kind; }
+
+function cell(tr, text, cls) { const td = tr.insertCell(); td.textContent = text; if (cls) td.className = cls; return td; }
+
+function action(td, label, fn, confirmText) {
+  const b = document.createElement('button');
+  b.className = 'small'; b.textContent = label;
+  b.onclick = async () => {
+    if (confirmText && !confirm(confirmText)) return;
+    b.disabled = true;
+    try { await fn(); await refresh(); } catch (e) { alert(e.message); b.disabled = false; }
+  };
+  td.append(b, ' ');
+}
+
+async function refresh() {
+  const [status, list] = await Promise.all([api('/api/status'), api('/api/orders?limit=100')]);
+  $('sAccount').textContent = status.account ? status.account.name : '–';
+  const useGroup = status.defaultMethod === 'group';
+  $('sBalanceLabel').textContent = useGroup ? 'เงินกองกลางกลุ่ม' : 'Robux ในบัญชี';
+  $('sBalance').textContent = fmt(useGroup ? status.groupBalance : status.userBalance);
+  $('sSpent').textContent = fmt(status.spentToday) + ' / ' + fmt(status.dailyLimit);
+  $('sQueue').textContent = (status.counts.pending || 0) + ' · ' + (status.counts.review || 0);
+  const notice = status.robloxError || status.lastWorkerError;
+  $('banner').hidden = !notice; $('banner').textContent = notice || '';
+  if (!$('method').dataset.init) { $('method').value = status.defaultMethod; $('method').dataset.init = '1'; }
+
+  const body = $('rows');
+  body.replaceChildren();
+  for (const o of list.orders) {
+    const tr = body.insertRow();
+    cell(tr, o.id, 'num'); cell(tr, o.username);
+    cell(tr, fmt(o.amount) + (o.cost !== o.amount ? ' (จ่าย ' + fmt(o.cost) + ')' : ''), 'num');
+    cell(tr, o.method);
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + o.status; badge.textContent = STATUS[o.status] || o.status;
+    tr.insertCell().append(badge);
+    cell(tr, o.error || o.detail || '', 'note');
+    cell(tr, new Date(o.updated_at).toLocaleString('th-TH'), 'num');
+    const td = tr.insertCell(); td.className = 'actions';
+    const post = (suffix, payload) => () => api('/api/orders/' + o.id + '/' + suffix, { method: 'POST', body: payload && JSON.stringify(payload) });
+    if (o.status === 'pending') action(td, 'ยกเลิก', post('cancel'));
+    if (o.status === 'failed') action(td, 'ส่งใหม่', post('retry'));
+    if (o.status === 'review') {
+      action(td, 'ส่งถึงแล้ว', post('resolve', { status: 'completed' }), 'ยืนยันว่าตรวจประวัติธุรกรรมแล้ว และ Robux ถูกส่งถึงผู้รับ?');
+      action(td, 'ส่งใหม่', post('retry'), 'ยืนยันว่าตรวจประวัติธุรกรรมแล้ว และ Robux ยังไม่ถูกจ่ายออก? ถ้าจ่ายไปแล้วจะกลายเป็นส่งซ้ำ');
+    }
+  }
+}
+
+async function enter() {
+  try {
+    await refresh();
+    $('login').hidden = true; $('app').hidden = false;
+    clearInterval(timer);
+    timer = setInterval(() => refresh().catch(() => {}), 5000);
+  } catch (e) { if (e.message !== 'unauthorized') showLogin(e.message); }
+}
+
+$('loginForm').onsubmit = (e) => {
+  e.preventDefault();
+  token = $('token').value.trim(); $('token').value = '';
+  try { sessionStorage.setItem('adminToken', token); } catch {}
+  enter();
+};
+$('logout').onclick = () => showLogin();
+
+const formValues = () => ({ username: $('username').value.trim().replace(/^@/, ''), amount: Number($('amount').value), method: $('method').value });
+
+$('checkBtn').onclick = async () => {
+  if (!$('sendForm').reportValidity()) return;
+  const v = formValues();
+  setMsg('กำลังตรวจสอบ…');
+  try {
+    const r = await api('/api/check?' + new URLSearchParams(v));
+    if (!r.found) return setMsg('ไม่พบผู้ใช้นี้', 'err');
+    const who = r.user.name + ' (ID ' + r.user.id + ')';
+    if (r.method === 'group') setMsg(r.ready ? who + ' พร้อมรับเงินจากกลุ่ม' : who + ' ยังรับไม่ได้: ' + r.eligibility, r.ready ? 'ok' : 'err');
+    else setMsg(r.ready ? who + ' มี Game Pass "' + r.gamePass.name + '" ราคา ' + fmt(r.requiredPrice) + ' R$ พร้อมแล้ว'
+      : who + ' ยังไม่มี Game Pass ที่เปิดขายราคา ' + fmt(r.requiredPrice) + ' R$', r.ready ? 'ok' : 'err');
+  } catch (e) { setMsg(e.message, 'err'); }
+};
+
+$('sendForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const v = formValues();
+  if (!confirm('ส่ง ' + fmt(v.amount) + ' R$ ให้ ' + v.username + ' ?')) return;
+  try {
+    const { order } = await api('/api/orders', { method: 'POST', body: JSON.stringify(v) });
+    setMsg('เข้าคิวแล้ว: ออเดอร์ #' + order.id, 'ok');
+    $('username').value = ''; $('amount').value = '';
+    await refresh();
+  } catch (e) { setMsg(e.message, 'err'); }
+};
+
+token ? enter() : showLogin();
+</script>
+</body>
+</html>

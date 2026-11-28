@@ -71,3 +71,6 @@ src/
   Colors = { Color3.fromRGB(80, 160, 255), Color3.fromRGB(255, 255, 255) } },
 ```
 ร้านค้าจะแสดงผลและขายได้อัตโนมัติ (สไตล์ที่มี: หมวก `PartyCone CatEars BunnyEars Flower Antenna TopHat Propeller Crown Halo`, สัตว์เลี้ยง `Ball Cube Ghost Cloud Ufo`, ออร่า `Particles Fire Sparkles`)
+
+## 💸 Robux Sender (โปรเจกต์แยก)
+ระบบส่ง Robux อัตโนมัติด้วย Username (เว็บแอดมิน + REST API) อยู่ในโฟลเดอร์ [`robux-sender/`](robux-sender/README.md)
